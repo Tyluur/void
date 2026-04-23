@@ -136,6 +136,7 @@ max_hit_melee = 20
 attack_bonus = 4
 immune_poison = true
 drop_table = "animated_bronze_armour"
+death_anim = 4167
 examine = "Animated bronze armour."
 
 [animated_iron_armour]
@@ -148,6 +149,7 @@ style = "crush"
 max_hit_melee = 30
 attack_bonus = 4
 drop_table = "animated_iron_armour"
+death_anim = 4167
 examine = "Animated iron armour."
 
 [animated_steel_armour]
@@ -161,6 +163,7 @@ max_hit_melee = 50
 attack_bonus = 4
 immune_poison = true
 drop_table = "animated_steel_armour"
+death_anim = 4167
 examine = "Animated steel armour."
 
 [animated_black_armour]
@@ -174,6 +177,7 @@ max_hit_melee = 70
 attack_bonus = 4
 immune_poison = true
 drop_table = "animated_black_armour"
+death_anim = 4167
 examine = "Animated black armour."
 
 [animated_mithril_armour]
@@ -187,6 +191,7 @@ max_hit_melee = 100
 attack_bonus = 4
 immune_poison = true
 drop_table = "animated_mithril_armour"
+death_anim = 4167
 examine = "Animated mithril armour."
 
 [animated_adamant_armour]
@@ -200,6 +205,7 @@ max_hit_melee = 120
 attack_bonus = 4
 immune_poison = true
 drop_table = "animated_adamant_armour"
+death_anim = 4167
 examine = "Animated adamant armour."
 
 [animated_rune_armour]
@@ -213,4 +219,5 @@ max_hit_melee = 140
 attack_bonus = 4
 immune_poison = true
 drop_table = "animated_rune_armour"
+death_anim = 4167
 examine = "Animated rune armour."
