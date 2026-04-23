@@ -1,13 +1,12 @@
 package content.minigame.warriors_guild
 
-import content.entity.obj.door.Door
-import content.entity.obj.door.enterDoor
 import content.entity.player.dialogue.type.statement
 import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.client.message
 import world.gregs.voidps.engine.client.ui.close
 import world.gregs.voidps.engine.client.ui.open
 import world.gregs.voidps.engine.data.definition.Areas
+import world.gregs.voidps.engine.entity.character.move.tele
 import world.gregs.voidps.engine.entity.character.player.Player
 import world.gregs.voidps.engine.entity.character.player.skill.Skill
 import world.gregs.voidps.engine.queue.softQueue
@@ -18,14 +17,11 @@ import java.util.concurrent.TimeUnit
 class WarriorsGuild : Script {
 
     init {
-        objectOperate("Open", "door_338_closed") {
-            if (!canEnter(this)) {
-                return@objectOperate
-            }
-            Door.openDoor(this, it.target, ticks = 3)
-        }
-
         entered("warriors_guild") {
+            if (!canEnter(this)) {
+                tele(2879, 3547, 0) // Teleport back outside
+                return@entered
+            }
             softTimers.start("wg_tick")
             if (!interfaces.contains("warriors_guild")) {
                 open("warriors_guild")
