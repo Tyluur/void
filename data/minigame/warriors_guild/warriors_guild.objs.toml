@@ -1,0 +1,111 @@
+[warriors_guild_animator]
+id = 15621
+examine = "A magical device to bring armour to life."
+
+[warriors_guild_dummy_attack]
+id = 15624
+examine = "A combat dummy for training Attack."
+
+[warriors_guild_dummy_slash]
+id = 15625
+examine = "A combat dummy for training Slash."
+
+[warriors_guild_dummy_strength]
+id = 15626
+examine = "A combat dummy for training Strength."
+
+[warriors_guild_dummy_shared]
+id = 15627
+examine = "A combat dummy for shared combat training."
+
+[warriors_guild_dummy_crush]
+id = 15628
+examine = "A combat dummy for training Crush."
+
+[warriors_guild_dummy_stab]
+id = 15629
+examine = "A combat dummy for training Stab."
+
+[warriors_guild_dummy_defence]
+id = 15630
+examine = "A combat dummy for training Defence."
+
+[warriors_guild_shotput_rack_18lb]
+id = 15664
+examine = "A rack for 18lb shots."
+
+[warriors_guild_shotput_rack_22lb]
+id = 15665
+examine = "A rack for 22lb shots."
+
+[warriors_guild_shotput_info]
+id = 15656
+examine = "Information about shotput."
+
+[warriors_guild_keg_1]
+id = 15669
+examine = "A keg to balance on your head."
+
+[warriors_guild_keg_2]
+id = 15670
+examine = "A keg to balance on your head."
+
+[warriors_guild_keg_3]
+id = 15671
+examine = "A keg to balance on your head."
+
+[warriors_guild_keg_4]
+id = 15672
+examine = "A keg to balance on your head."
+
+[warriors_guild_keg_5]
+id = 15673
+examine = "A keg to balance on your head."
+
+[warriors_guild_catapult]
+id = 15616
+examine = "A defensive catapult."
+
+[warriors_guild_cyclops_gate]
+id = 15641
+examine = "A gate to the cyclops room."
+
+[warriors_guild_cyclops_gate_2]
+id = 15644
+examine = "A gate to the cyclops room."
+
+[warriors_guild_cyclops_gate_3]
+id = 15647
+examine = "A gate to the cyclops room."
+
+[warriors_guild_cyclops_gate_4]
+id = 66599
+examine = "A gate to the cyclops room."
+
+[warriors_guild_cyclops_gate_5]
+id = 66601
+examine = "A gate to the cyclops room."
+
+[warriors_guild_internal_door]
+id = 15658
+examine = "A door."
+
+[warriors_guild_internal_door_2]
+id = 15660
+examine = "A door."
+
+[warriors_guild_internal_door_3]
+id = 15653
+examine = "A door to the Warriors' Guild."
+
+[warriors_guild_internal_door_4]
+id = 66758
+examine = "A door."
+
+[warriors_guild_scoreboard]
+id = 56887
+examine = "A scoreboard showing cyclops kills."
+
+[warriors_guild_shotput_counter]
+id = 66604
+examine = "A counter for shotput distances."
