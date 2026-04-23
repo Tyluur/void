@@ -2,3 +2,42 @@
 x = [2879, 2882]
 y = [3544, 3548]
 tags = ["teleport"]
+
+[warriors_guild]
+x = [2830, 2890]
+y = [3530, 3570]
+
+[warriors_guild_catapult]
+x = [2837, 2847]
+y = [3538, 3552]
+level = 1
+
+[warriors_guild_dummy]
+x = [2855, 2860]
+y = [3545, 3550]
+level = 0
+
+[warriors_guild_shotput]
+x = [2870, 2885]
+y = [3540, 3555]
+level = 1
+
+[warriors_guild_kegs]
+x = [2858, 2865]
+y = [3535, 3545]
+level = 1
+
+[warriors_guild_cyclops_lobby]
+x = [2840, 2850]
+y = [3533, 3538]
+level = 2
+
+[warriors_guild_cyclops_room]
+x = [2840, 2875]
+y = [3533, 3555]
+level = 2
+
+[warriors_guild_animator]
+x = [2840, 2850]
+y = [3530, 3545]
+level = 0
