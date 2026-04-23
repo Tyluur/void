@@ -4,10 +4,9 @@ import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.data.definition.Areas
 import world.gregs.voidps.engine.entity.character.player.Player
 import world.gregs.voidps.engine.entity.character.player.skill.Skill
-import world.gregs.voidps.engine.entity.character.setAnimation
 import world.gregs.voidps.engine.entity.obj.GameObject
-import world.gregs.voidps.engine.entity.obj.Objects
-import world.gregs.voidps.engine.map.collision.CollisionStrategies
+import world.gregs.voidps.engine.entity.obj.GameObjects
+import world.gregs.voidps.engine.timer.Timer
 import world.gregs.voidps.type.random
 import world.gregs.voidps.type.Tile
 import java.util.concurrent.TimeUnit
