@@ -1,5 +1,6 @@
 package content.minigame.warriors_guild
 
+import content.entity.obj.door.Door
 import content.entity.obj.door.enterDoor
 import content.entity.player.dialogue.type.statement
 import world.gregs.voidps.engine.Script
@@ -21,7 +22,7 @@ class WarriorsGuild : Script {
             if (!canEnter(this)) {
                 return@objectOperate
             }
-            enterDoor(it.target, ticks = 3)
+            Door.openDoor(this, it.target, ticks = 3)
         }
 
         entered("warriors_guild") {
