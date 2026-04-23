@@ -1,13 +1,12 @@
 package content.minigame.warriors_guild
 
-import content.entity.obj.door.doorTarget
+import content.entity.obj.door.enterDoor
 import content.entity.player.dialogue.type.statement
 import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.client.message
 import world.gregs.voidps.engine.client.ui.close
 import world.gregs.voidps.engine.client.ui.open
 import world.gregs.voidps.engine.data.definition.Areas
-import world.gregs.voidps.engine.entity.character.move.tele
 import world.gregs.voidps.engine.entity.character.player.Player
 import world.gregs.voidps.engine.entity.character.player.skill.Skill
 import world.gregs.voidps.engine.queue.softQueue
@@ -22,8 +21,7 @@ class WarriorsGuild : Script {
             if (!canEnter(this)) {
                 return@objectOperate
             }
-            val target = doorTarget(this, it.target) ?: return@objectOperate
-            tele(target)
+            enterDoor(it.target, ticks = 3)
         }
 
         entered("warriors_guild") {
