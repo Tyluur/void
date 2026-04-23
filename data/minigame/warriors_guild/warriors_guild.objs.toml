@@ -86,8 +86,12 @@ examine = "A door."
 id = 15660
 examine = "A door."
 
-[warriors_guild_internal_door_3]
+[warriors_guild_internal_door_3_closed]
 id = 15653
+examine = "A door to the Warriors' Guild."
+
+[warriors_guild_internal_door_3_opened]
+id = 15655
 examine = "A door to the Warriors' Guild."
 
 [warriors_guild_scoreboard]

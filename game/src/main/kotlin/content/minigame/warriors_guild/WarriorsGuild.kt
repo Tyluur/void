@@ -3,6 +3,7 @@ package content.minigame.warriors_guild
 import content.entity.combat.killer
 import content.entity.effect.movementDelay
 import content.entity.obj.door.Door
+import content.entity.obj.door.enterDoor
 import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.client.message
 import world.gregs.voidps.engine.client.ui.close
@@ -42,11 +43,11 @@ class WarriorsGuild : Script {
     }
 
     init {
-        objectOperate("Open", "door_338_closed") {
+        objectOperate("Open", "warriors_guild_internal_door_3_closed") {
             if (!canEnter(this)) {
                 return@objectOperate
             }
-            Door.openDoor(this, it.target, ticks = 3)
+            enterDoor(it.target, ticks = 3)
         }
 
         itemOnObjectOperate(allArmourItems.joinToString(","), "warriors_guild_animator", handler = ::handleAnimator)
