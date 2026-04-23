@@ -1,0 +1,43 @@
+[wg_points_strength]
+format = "int"
+persist = true
+
+[wg_points_defence]
+format = "int"
+persist = true
+
+[wg_points_attack]
+format = "int"
+persist = true
+
+[wg_points_combat]
+format = "int"
+persist = true
+
+[wg_points_barrels]
+format = "int"
+persist = true
+
+[wg_cyclops_option]
+format = "string"
+persist = true
+
+[wg_defence_style]
+format = "int"
+persist = false
+
+[wg_animator_spawned]
+format = "boolean"
+persist = false
+
+[wg_keg_count]
+format = "int"
+persist = false
+
+[wg_keg_ticks]
+format = "int"
+persist = false
+
+[wg_last_dummy]
+format = "double"
+persist = false
