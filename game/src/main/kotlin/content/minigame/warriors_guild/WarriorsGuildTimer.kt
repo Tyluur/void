@@ -12,7 +12,7 @@ import world.gregs.voidps.type.random
 import world.gregs.voidps.type.Tile
 import java.util.concurrent.TimeUnit
 
-class WarriorsGuildTimer : Script() {
+class WarriorsGuildTimer : Script {
 
     companion object {
         private const val TICK_INTERVAL = 14

@@ -3,16 +3,19 @@ package content.minigame.warriors_guild
 import content.entity.obj.door.doorTarget
 import content.entity.player.dialogue.type.statement
 import world.gregs.voidps.engine.Script
+import world.gregs.voidps.engine.client.message
 import world.gregs.voidps.engine.client.ui.close
 import world.gregs.voidps.engine.client.ui.open
 import world.gregs.voidps.engine.data.definition.Areas
+import world.gregs.voidps.engine.entity.character.move.tele
 import world.gregs.voidps.engine.entity.character.player.Player
 import world.gregs.voidps.engine.entity.character.player.skill.Skill
 import world.gregs.voidps.engine.queue.softQueue
 import world.gregs.voidps.engine.timer.Timer
+import world.gregs.voidps.engine.timer.toTicks
 import java.util.concurrent.TimeUnit
 
-class WarriorsGuild : Script() {
+class WarriorsGuild : Script {
 
     init {
         objectOperate("Open", "door_338_closed") {
@@ -48,7 +51,7 @@ class WarriorsGuild : Script() {
         val attackLevel = player.levels.get(Skill.Attack)
         val strengthLevel = player.levels.get(Skill.Strength)
         if (attackLevel + strengthLevel < 130) {
-            statement("You do not meet the requirements to enter this Guild.")
+            player.message("You do not meet the requirements to enter this Guild.")
             return false
         }
         return true
