@@ -1,3 +1,16 @@
 [warriors_guild]
 id = 1057
+type = "overlay"
+
+[warriors_guild_catapult_shield]
+id = 411
+
+[warriors_guild_cyclops_selection]
+id = 1058
+
+[warriors_guild_shotput_info]
+id = 412
+
+[warriors_guild_shotput_info_2]
+id = 410
 
