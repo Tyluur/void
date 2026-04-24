@@ -66,12 +66,24 @@ examine = "A keg to balance on your head."
 id = 15616
 examine = "A defensive catapult."
 
-[warriors_guild_cyclops_gate]
+[warriors_guild_cyclops_gate_closed]
 id = 15641
+gate = false
 examine = "A gate to the cyclops room."
 
-[warriors_guild_cyclops_gate_2]
+[warriors_guild_cyclops_gate_opened]
+id = 15643
+gate = false
+examine = "A gate to the cyclops room."
+
+[warriors_guild_cyclops_gate_2_closed]
 id = 15644
+gate = false
+examine = "A gate to the cyclops room."
+
+[warriors_guild_cyclops_gate_2_opened]
+id = 15646
+gate = false
 examine = "A gate to the cyclops room."
 
 [warriors_guild_cyclops_gate_3]

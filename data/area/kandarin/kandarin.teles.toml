@@ -192,3 +192,12 @@ delta = { level = 1 }
 option = "Climb-down"
 tile = { x = 2677, y = 3087, level = 1 }
 delta = { level = -1 }
+
+# Warriors Guild cyclops room gates
+[warriors_guild_cyclops_gate_closed]
+option = "Open"
+tile = { x = 2844, y = 3540, level = 2 }
+
+[warriors_guild_cyclops_gate_2_closed]
+option = "Open"
+tile = { x = 2845, y = 3540, level = 2 }
