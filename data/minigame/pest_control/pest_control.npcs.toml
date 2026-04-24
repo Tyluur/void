@@ -83,6 +83,276 @@ examine = "A squire of balance."
 id = 6141
 examine = "A squire of balance."
 
+# Novice Portals (shielded)
+[portal_purple_shielded_novice]
+id = 6142
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 50
+range = 1
+mage = 25
+style = "crush"
+hitpoints = 2000
+
+[portal_blue_shielded_novice]
+id = 6143
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 50
+range = 1
+mage = 25
+style = "crush"
+hitpoints = 2000
+
+[portal_yellow_shielded_novice]
+id = 6144
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 50
+range = 1
+mage = 50
+style = "crush"
+hitpoints = 2000
+
+[portal_red_shielded_novice]
+id = 6145
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 50
+range = 1
+mage = 50
+style = "crush"
+hitpoints = 2000
+
+# Novice Portals (unshielded)
+[portal_purple_unshielded_novice]
+id = 6146
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2000
+
+[portal_blue_unshielded_novice]
+id = 6147
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 15
+style = "crush"
+hitpoints = 2000
+
+[portal_yellow_unshielded_novice]
+id = 6148
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2000
+
+[portal_red_unshielded_novice]
+id = 6149
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2000
+
+# Intermediate Portals (shielded)
+[portal_purple_shielded_intermediate]
+id = 6150
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 70
+range = 1
+mage = 70
+style = "crush"
+hitpoints = 2500
+
+[portal_blue_shielded_intermediate]
+id = 6151
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 70
+range = 1
+mage = 40
+style = "crush"
+hitpoints = 2500
+
+[portal_yellow_shielded_intermediate]
+id = 6152
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 70
+range = 1
+mage = 70
+style = "crush"
+hitpoints = 2500
+
+[portal_red_shielded_intermediate]
+id = 6153
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 70
+range = 1
+mage = 70
+style = "crush"
+hitpoints = 2500
+
+# Intermediate Portals (unshielded)
+[portal_purple_unshielded_intermediate]
+id = 6154
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2500
+
+[portal_blue_unshielded_intermediate]
+id = 6155
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 15
+style = "crush"
+hitpoints = 2500
+
+[portal_yellow_unshielded_intermediate]
+id = 6156
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2500
+
+[portal_red_unshielded_intermediate]
+id = 6157
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2500
+
+# Veteran Portals (shielded)
+[portal_purple_shielded_veteran]
+id = 7551
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 90
+range = 1
+mage = 70
+style = "crush"
+hitpoints = 2500
+
+[portal_blue_shielded_veteran]
+id = 7552
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 90
+range = 1
+mage = 50
+style = "crush"
+hitpoints = 2500
+
+[portal_yellow_shielded_veteran]
+id = 7553
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 90
+range = 1
+mage = 90
+style = "crush"
+hitpoints = 2500
+
+[portal_red_shielded_veteran]
+id = 7554
+examine = "Not somewhere I want to go..."
+att = 1
+str = 1
+def = 90
+range = 1
+mage = 90
+style = "crush"
+hitpoints = 2500
+
+# Veteran Portals (unshielded)
+[portal_purple_unshielded_veteran]
+id = 7555
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2500
+
+[portal_blue_unshielded_veteran]
+id = 7556
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 15
+style = "crush"
+hitpoints = 2500
+
+[portal_yellow_unshielded_veteran]
+id = 7557
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2500
+
+[portal_red_unshielded_veteran]
+id = 7558
+examine = "The Void Knight will soon weaken the shield."
+att = 1
+str = 1
+def = 30
+range = 1
+mage = 30
+style = "crush"
+hitpoints = 2500
+
 [commodore_matthias_spawn_pest_control]
 id = 11497
 wander_range = 2
@@ -220,8 +490,9 @@ str = 57
 def = 43
 style = "crush"
 max_hit_melee = 70
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Mind your toes!"
+combat_def = "brawler"
 
 [brawler_level_76]
 id = 3773
@@ -231,8 +502,9 @@ str = 82
 def = 67
 style = "crush"
 max_hit_melee = 90
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Mind your toes!"
+combat_def = "brawler"
 
 [brawler_level_101]
 id = 3774
@@ -242,8 +514,9 @@ str = 107
 def = 93
 style = "crush"
 max_hit_melee = 120
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Mind your toes!"
+combat_def = "brawler"
 
 [brawler_level_129]
 id = 3775
@@ -253,15 +526,17 @@ str = 132
 def = 118
 style = "crush"
 max_hit_melee = 140
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Mind your toes!"
+combat_def = "brawler"
 
 [brawler_level_158]
 id = 3776
 style = "crush"
 max_hit_melee = 150
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Mind your toes!"
+combat_def = "brawler"
 
 [defiler_level_33]
 id = 3762
@@ -272,8 +547,9 @@ def = 17
 range = 46
 style = "range"
 max_hit_melee = 60
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Duck!"
+combat_def = "defiler"
 
 [defiler_level_33_2]
 id = 3763
@@ -287,8 +563,9 @@ def = 29
 range = 66
 style = "range"
 max_hit_melee = 80
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Duck!"
+combat_def = "defiler"
 
 [defiler_level_50_2]
 id = 3765
@@ -303,8 +580,9 @@ def = 41
 range = 84
 style = "range"
 max_hit_melee = 90
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Duck!"
+combat_def = "defiler"
 
 [defiler_level_67]
 id = 3767
@@ -315,8 +593,9 @@ def = 41
 range = 85
 style = "range"
 max_hit_melee = 90
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Duck!"
+combat_def = "defiler"
 
 [defiler_level_80]
 id = 3768
@@ -327,8 +606,9 @@ def = 53
 range = 98
 style = "range"
 max_hit_melee = 110
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Duck!"
+combat_def = "defiler"
 
 [defiler_level_80_2]
 id = 3769
@@ -343,8 +623,9 @@ def = 65
 range = 117
 style = "range"
 max_hit_melee = 130
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Duck!"
+combat_def = "defiler"
 
 [defiler_level_97_2]
 id = 3771
@@ -356,6 +637,7 @@ def = 120
 mage = 0
 immune_poison = true
 examine = "The Void Knight will soon weaken the shield."
+combat_def = "portal"
 
 [portal_shield_blue]
 id = 6143
@@ -375,6 +657,7 @@ def = 120
 mage = 0
 immune_poison = true
 examine = "Not somewhere I want to go..."
+combat_def = "portal"
 
 [portal_blue]
 id = 6151
@@ -398,8 +681,9 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 70
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Worse than termites!"
+combat_def = "ravager"
 
 [ravager_level_53]
 id = 3743
@@ -411,8 +695,9 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 90
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Worse than termites!"
+combat_def = "ravager"
 
 [ravager_level_71]
 id = 3744
@@ -424,8 +709,9 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 120
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Worse than termites!"
+combat_def = "ravager"
 
 [ravager_level_89]
 id = 3745
@@ -437,8 +723,9 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 140
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Worse than termites!"
+combat_def = "ravager"
 
 [ravager_level_106]
 id = 3746
@@ -450,8 +737,9 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 170
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Worse than termites!"
+combat_def = "ravager"
 
 [shifter_level_38]
 id = 3732
@@ -463,9 +751,10 @@ mage = 27
 range = 0
 style = "stab"
 max_hit_melee = 50
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
+combat_def = "shifter"
 
 [shifter_level_38_2]
 id = 3733
@@ -481,9 +770,10 @@ mage = 37
 range = 0
 style = "stab"
 max_hit_melee = 60
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
+combat_def = "shifter"
 
 [shifter_level_57_2]
 id = 3735
@@ -499,9 +789,10 @@ mage = 47
 range = 0
 style = "stab"
 max_hit_melee = 80
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
+combat_def = "shifter"
 
 [shifter_level_76_2]
 id = 3737
@@ -517,9 +808,10 @@ mage = 50
 range = 0
 style = "stab"
 max_hit_melee = 80
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
+combat_def = "shifter"
 
 [shifter_level_90_2]
 id = 3739
@@ -535,9 +827,10 @@ mage = 60
 range = 0
 style = "stab"
 max_hit_melee = 90
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
+combat_def = "shifter"
 
 [shifter_level_104_2]
 id = 3741
@@ -551,10 +844,11 @@ str = 17
 def = 43
 mage = 37
 range = 0
-style = "melee"
 style = "crush"
 max_hit_melee = 30
+hunt_mode = "aggressive"
 examine = "Eeewww!"
+combat_def = "spinner"
 
 [spinner_level_55]
 id = 3748
@@ -564,10 +858,11 @@ str = 22
 def = 68
 mage = 52
 range = 0
-style = "melee"
 style = "crush"
 max_hit_melee = 30
+hunt_mode = "aggressive"
 examine = "Eeewww!"
+combat_def = "spinner"
 
 [spinner_level_74]
 id = 3749
@@ -577,10 +872,11 @@ str = 27
 def = 93
 mage = 67
 range = 0
-style = "melee"
 style = "crush"
 max_hit_melee = 40
+hunt_mode = "aggressive"
 examine = "Eeewww!"
+combat_def = "spinner"
 
 [spinner_level_88]
 id = 3751
@@ -590,10 +886,11 @@ str = 37
 def = 143
 mage = 37
 range = 0
-style = "melee"
 style = "crush"
 max_hit_melee = 50
+hunt_mode = "aggressive"
 examine = "Eeewww!"
+combat_def = "spinner"
 
 [spinner_level_92]
 id = 3750
@@ -603,10 +900,11 @@ str = 32
 def = 118
 mage = 82
 range = 0
-style = "melee"
 style = "crush"
 max_hit_melee = 40
+hunt_mode = "aggressive"
 examine = "Eeewww!"
+combat_def = "spinner"
 
 [splatter_level_22]
 id = 3727
@@ -618,8 +916,9 @@ mage = 17
 range = 0
 style = "crush"
 max_hit_melee = 30
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
+combat_def = "splatter"
 
 [splatter_level_33]
 id = 3728
@@ -631,8 +930,9 @@ mage = 22
 range = 0
 style = "crush"
 max_hit_melee = 30
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
+combat_def = "splatter"
 
 [splatter_level_44]
 id = 3729
@@ -644,8 +944,9 @@ mage = 27
 range = 0
 style = "crush"
 max_hit_melee = 40
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
+combat_def = "splatter"
 
 [splatter_level_54]
 id = 3730
@@ -657,8 +958,9 @@ mage = 32
 range = 0
 style = "crush"
 max_hit_melee = 40
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
+combat_def = "splatter"
 
 [splatter_level_65]
 id = 3731
@@ -670,8 +972,9 @@ mage = 37
 range = 0
 style = "crush"
 max_hit_melee = 50
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
+combat_def = "splatter"
 
 [torcher_level_33]
 id = 3752
@@ -683,8 +986,9 @@ mage = 46
 range = 0
 style = "ranged_magic"
 max_hit_melee = 60
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
+combat_def = "torcher"
 
 [torcher_level_33_2]
 id = 3753
@@ -700,8 +1004,9 @@ mage = 66
 range = 0
 style = "ranged_magic"
 max_hit_melee = 80
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
+combat_def = "torcher"
 
 [torcher_level_49_2]
 id = 3755
@@ -721,8 +1026,9 @@ mage = 85
 range = 0
 style = "ranged_magic"
 max_hit_melee = 90
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
+combat_def = "torcher"
 
 [torcher_level_66_2]
 id = 3757
@@ -738,8 +1044,9 @@ mage = 97
 range = 0
 style = "ranged_magic"
 max_hit_melee = 110
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
+combat_def = "torcher"
 
 [torcher_level_79_2]
 id = 3759
@@ -755,8 +1062,9 @@ mage = 107
 range = 0
 style = "ranged_magic"
 max_hit_melee = 120
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
+combat_def = "torcher"
 
 [torcher_level_92]
 id = 3761
@@ -768,8 +1076,9 @@ mage = 107
 range = 0
 style = "ranged_magic"
 max_hit_melee = 120
-hunt_mode = "cowardly"
+hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
+combat_def = "torcher"
 
 [void_knight]
 id = 3782

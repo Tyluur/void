@@ -1,2 +1,16 @@
 [portal]
 id = 654
+
+[defiler_spine]
+id = 657
+delay = 41
+height = 3
+curve = 15
+time_offset = 5
+
+[torcher_fire]
+id = 647
+delay = 41
+height = 3
+curve = 15
+time_offset = 5

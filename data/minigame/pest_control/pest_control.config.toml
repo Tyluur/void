@@ -1,0 +1,120 @@
+# Pest Control Configuration
+
+[difficulty.novice]
+combat_requirement = 40
+entry_tile_x = 2661
+entry_tile_y = 2639
+entry_tile_level = 0
+exit_tile_x = 2657
+exit_tile_y = 2639
+exit_tile_level = 0
+portal_health = 2000
+reward_points = 3
+portal_shielded_ids = ["portal_purple_unshielded_novice", "portal_blue_unshielded_novice", "portal_yellow_unshielded_novice", "portal_red_unshielded_novice"]
+portal_unshielded_ids = ["portal_purple_shielded_novice", "portal_blue_shielded_novice", "portal_yellow_shielded_novice", "portal_red_shielded_novice"]
+
+[difficulty.intermediate]
+combat_requirement = 70
+entry_tile_x = 2641
+entry_tile_y = 2644
+entry_tile_level = 0
+exit_tile_x = 2644
+exit_tile_y = 2644
+exit_tile_level = 0
+portal_health = 2500
+reward_points = 4
+portal_shielded_ids = ["portal_purple_unshielded_intermediate", "portal_blue_unshielded_intermediate", "portal_yellow_unshielded_intermediate", "portal_red_unshielded_intermediate"]
+portal_unshielded_ids = ["portal_purple_shielded_intermediate", "portal_blue_shielded_intermediate", "portal_yellow_shielded_intermediate", "portal_red_shielded_intermediate"]
+
+[difficulty.veteran]
+combat_requirement = 100
+entry_tile_x = 2635
+entry_tile_y = 2653
+entry_tile_level = 0
+exit_tile_x = 2638
+exit_tile_y = 2653
+exit_tile_level = 0
+portal_health = 2500
+reward_points = 5
+portal_shielded_ids = ["portal_purple_unshielded_veteran", "portal_blue_unshielded_veteran", "portal_yellow_unshielded_veteran", "portal_red_unshielded_veteran"]
+portal_unshielded_ids = ["portal_purple_shielded_veteran", "portal_blue_shielded_veteran", "portal_yellow_shielded_veteran", "portal_red_shielded_veteran"]
+
+[pest_data.novice]
+pests = [
+    "shifter_level_38", "shifter_level_38_2", "shifter_level_57", "shifter_level_57_2",
+    "ravager_level_36", "ravager_level_53",
+    "brawler_level_51",
+    "splatter_level_22", "splatter_level_33", "splatter_level_44",
+    "spinner_level_36", "spinner_level_55",
+    "torcher_level_33", "torcher_level_33_2", "torcher_level_49",
+    "defiler_level_33", "defiler_level_50"
+]
+shifters = ["shifter_level_38", "shifter_level_38_2", "shifter_level_57", "shifter_level_57_2"]
+
+[pest_data.intermediate]
+pests = [
+    "shifter_level_57", "shifter_level_57_2", "shifter_level_76", "shifter_level_76_2",
+    "ravager_level_53", "ravager_level_71",
+    "brawler_level_51", "brawler_level_76",
+    "splatter_level_33", "splatter_level_44", "splatter_level_54",
+    "spinner_level_55", "spinner_level_74",
+    "torcher_level_49", "torcher_level_49_2", "torcher_level_66",
+    "defiler_level_50", "defiler_level_67", "defiler_level_80"
+]
+shifters = ["shifter_level_57", "shifter_level_57_2", "shifter_level_76", "shifter_level_76_2"]
+
+[pest_data.veteran]
+pests = [
+    "shifter_level_76", "shifter_level_76_2", "shifter_level_90", "shifter_level_90_2",
+    "ravager_level_71", "ravager_level_89",
+    "brawler_level_76", "brawler_level_101",
+    "splatter_level_44", "splatter_level_54", "splatter_level_65",
+    "spinner_level_74", "spinner_level_88",
+    "torcher_level_66", "torcher_level_66_2", "torcher_level_79",
+    "defiler_level_67", "defiler_level_80", "defiler_level_97"
+]
+shifters = ["shifter_level_76", "shifter_level_76_2", "shifter_level_90", "shifter_level_90_2"]
+
+[locations]
+entrance_x = 2659
+entrance_y = 2614
+entrance_level = 0
+region_id = 10536
+
+[locations.knight_offset]
+x = 32
+y = 32
+level = 0
+
+[locations.portals.purple]
+x = 4
+y = 31
+level = 0
+
+[locations.portals.blue]
+x = 56
+y = 28
+level = 0
+
+[locations.portals.yellow]
+x = 45
+y = 10
+level = 0
+
+[locations.portals.red]
+x = 21
+y = 9
+level = 0
+
+[timers]
+lobby_timer_seconds = 30
+game_timer_seconds = 1200
+pest_spawn_interval_seconds = 10
+first_shield_drop_seconds = 30
+subsequent_shield_drop_interval_seconds = 30
+
+[limits]
+min_players_to_start = 1
+knight_health = 250
+max_pests_per_portal = 15
+max_pests_near_knight = 4

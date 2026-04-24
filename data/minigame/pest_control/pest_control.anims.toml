@@ -1,0 +1,89 @@
+[brawler_attack]
+id = 3896
+
+[brawler_defend]
+id = 3895
+
+[brawler_death]
+id = 3894
+
+[defiler_attack]
+id = 3920
+
+[defiler_defend]
+id = 3921
+
+[defiler_death]
+id = 3922
+
+[defiler_projectile]
+id = 657
+
+[ravager_attack]
+id = 3915
+
+[ravager_defend]
+id = 3916
+
+[ravager_death]
+id = 3917
+
+[shifter_attack]
+id = 3901
+
+[shifter_defend]
+id = 3902
+
+[shifter_death]
+id = 3903
+
+[spinner_attack]
+id = 3908
+
+[spinner_defend]
+id = 3909
+
+[spinner_death]
+id = 3910
+
+[splatter_attack]
+id = 3891
+
+[splatter_defend]
+id = 3890
+
+[splatter_death]
+id = 3888
+
+[torcher_attack]
+id = 3882
+
+[torcher_defend]
+id = 3880
+
+[torcher_death]
+id = 3881
+
+[torcher_projectile]
+id = 647
+
+[shifter_teleport]
+id = 3904
+
+[shifter_teleport_graphics]
+id = 654
+
+[spinner_heal]
+id = 3911
+
+[spinner_heal_graphics]
+id = 658
+
+[splatter_explode_start]
+id = 3888
+
+[splatter_explode_end]
+id = 3889
+
+[splatter_explosion_graphics]
+id = 649

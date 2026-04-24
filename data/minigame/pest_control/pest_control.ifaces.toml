@@ -27,6 +27,9 @@ id = 0
 [.knight_health]
 id = 1
 
+[.activity]
+id = 11
+
 [.portal_purple_health]
 id = 13
 
@@ -38,4 +41,16 @@ id = 15
 
 [.portal_red_health]
 id = 16
+
+[.purple_shield]
+id = 18
+
+[.blue_shield]
+id = 20
+
+[.yellow_shield]
+id = 22
+
+[.red_shield]
+id = 24
 

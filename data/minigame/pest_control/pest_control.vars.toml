@@ -6,3 +6,6 @@ format = "boolean"
 
 [pest_control_points]
 format = "integer"
+
+[pest_control_shields]
+format = "integer"

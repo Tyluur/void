@@ -1,0 +1,34 @@
+[squire_novice_entry]
+type = "npc_chat_np1"
+npc_id = "squire_novice_pest_control"
+npc_name = "Squire"
+line1 = "You need a combat level of 40 or more to enter this boat."
+
+[squire_intermediate_entry]
+type = "npc_chat_np1"
+npc_id = "squire_intermediate_pest_control"
+npc_name = "Squire"
+line1 = "You need a combat level of 70 or more to enter this boat."
+
+[squire_veteran_entry]
+type = "npc_chat_np1"
+npc_id = "squire_veteran_pest_control"
+npc_name = "Squire"
+line1 = "You need a combat level of 100 or more to enter this boat."
+
+[pest_control_reward_success]
+type = "message_np2"
+line1 = "Congratulations! You have successfully kept the lander safe"
+line2 = "and have been awarded: {coins} gold coins and {points} commendation points."
+
+[pest_control_reward_failed]
+type = "message_np1"
+line1 = "You failed to protect the void knight and have not been awarded any points."
+
+[pest_control_reward_no_zeal]
+type = "message_np1"
+line1 = "The knights notice your lack of zeal in that battle and have not presented you with any points."
+
+[follower_restriction]
+type = "message_np1"
+line1 = "You can't take a follower into the lander, there isn't enough room!"
