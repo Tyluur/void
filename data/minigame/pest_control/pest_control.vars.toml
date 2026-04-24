@@ -3,3 +3,6 @@ format = "boolean"
 
 [elite_void_set_effect]
 format = "boolean"
+
+[pest_control_points]
+format = "integer"

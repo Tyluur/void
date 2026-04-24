@@ -3,7 +3,39 @@ id = 267
 
 [pest_control_waiting]
 id = 407
+type = "overlay"
+
+[.title]
+id = 3
+
+[.departure]
+id = 13
+
+[.players_ready]
+id = 14
+
+[.commendations]
+id = 16
 
 [pest_control_playing]
 id = 408
+type = "overlay"
+
+[.time]
+id = 0
+
+[.knight_health]
+id = 1
+
+[.portal_purple_health]
+id = 13
+
+[.portal_blue_health]
+id = 14
+
+[.portal_yellow_health]
+id = 15
+
+[.portal_red_health]
+id = 16
 

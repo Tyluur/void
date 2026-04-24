@@ -2,6 +2,11 @@
 
 package content.entity.player.command
 
+import content.quest.clearInstance
+import content.quest.exitInstance
+import content.quest.instanceOffset
+import content.quest.setInstanceLogout
+import content.quest.smallInstance
 import content.social.trade.exchange.GrandExchange
 import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.client.command.adminCommand
@@ -93,6 +98,21 @@ class TeleportCommands(
                 return@adminCommand
             }
             target.tele(tile)
+        }
+
+        // Pest Control instance test command
+        adminCommand("test_pest_instance", desc = "Test Pest Control instance creation") {
+            val pestRegion = Region(10536)  // Pest Control source region ID (calculated from 41, 40)
+            smallInstance(pestRegion, 3)  // Copy map with 3 levels (matching Fight Caves)
+            delay(1)
+            val offset = instanceOffset()
+            tele(Tile(2659, 2614, 0).add(offset))  // Absolute world entrance coordinate (2624+35, 2560+54)
+            setInstanceLogout(Tile(2657, 2639, 0))  // Exit to Pest Control novice lander
+            message("Pest Control instance created. Use ::exit_instance to leave.", ChatType.Console)
+        }
+
+        adminCommand("exit_instance", desc = "Exit current instance and cleanup") {
+            exitInstance()
         }
     }
 

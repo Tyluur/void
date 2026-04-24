@@ -9,3 +9,11 @@ examine = "Handy for boarding the ship."
 [pest_control_gangplank_enter]
 id = 14306
 examine = "Handy for boarding the ship."
+
+[pest_control_gangplank_novice]
+id = 14315
+examine = "Handy for boarding the ship."
+
+[pest_control_ladder_exit]
+id = 14314
+examine = "Climb down to leave the lander."
