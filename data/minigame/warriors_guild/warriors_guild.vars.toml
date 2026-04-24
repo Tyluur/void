@@ -22,6 +22,14 @@ persist = true
 format = "string"
 persist = true
 
+[wg_cyclops_last_single]
+format = "string"
+persist = true
+
+[wg_in_cyclops_room]
+format = "boolean"
+persist = true
+
 [wg_defence_style]
 format = "int"
 persist = false

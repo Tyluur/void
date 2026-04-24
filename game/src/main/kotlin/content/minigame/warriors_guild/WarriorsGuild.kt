@@ -16,12 +16,15 @@ import world.gregs.voidps.engine.entity.character.npc.NPCs
 import world.gregs.voidps.engine.entity.character.player.Player
 import world.gregs.voidps.engine.entity.character.player.skill.Skill
 import world.gregs.voidps.engine.entity.obj.GameObject
+import world.gregs.voidps.engine.entity.character.player.equip.equipped
+import world.gregs.voidps.engine.inv.add
 import world.gregs.voidps.engine.inv.inventory
 import world.gregs.voidps.engine.inv.remove
 import world.gregs.voidps.engine.queue.softQueue
 import world.gregs.voidps.engine.timer.Timer
 import world.gregs.voidps.engine.timer.toTicks
 import world.gregs.voidps.network.login.protocol.encode.sendVarbit
+import world.gregs.voidps.network.login.protocol.visual.update.player.EquipSlot
 import world.gregs.voidps.type.Direction
 import java.util.concurrent.TimeUnit
 
@@ -68,6 +71,36 @@ class WarriorsGuild : Script {
          * Index corresponds to armour tier: 0=bronze(5), 1=iron(10), 2=steel(15), 3=black(20), 4=mithril(50), 5=adamant(60), 6=rune(80)
          */
         val ARMOR_POINTS = intArrayOf(5, 10, 15, 20, 50, 60, 80)
+
+        /**
+         * List of defenders from best to worst.
+         */
+        private val DEFENDERS = listOf(
+            "dragon_defender",
+            "rune_defender",
+            "adamant_defender",
+            "mithril_defender",
+            "black_defender",
+            "steel_defender",
+            "iron_defender",
+            "bronze_defender"
+        )
+
+        /**
+         * Retrieves the next defender the player should receive from cyclopses.
+         * Checks equipment and inventory in order from best to worst.
+         *
+         * @param player The player to check
+         * @return The item ID of the defender to drop (next tier up from what they have), or "bronze_defender" if none found
+         */
+        fun getBestDefender(player: Player): String {
+            for (i in DEFENDERS.indices) {
+                if (player.equipped(EquipSlot.Shield).id == DEFENDERS[i] || player.inventory.contains(DEFENDERS[i])) {
+                    return DEFENDERS[if (i - 1 < 0) 0 else i - 1]
+                }
+            }
+            return DEFENDERS.last()
+        }
     }
 
     init {
@@ -106,7 +139,7 @@ class WarriorsGuild : Script {
                 "rune" -> 6
                 else -> 0
             }
-            player["wg_animator_points"] = player.get("wg_animator_points", 0) + ARMOR_POINTS[index]
+            player["wg_points_combat"] = player.get("wg_points_combat", 0) + ARMOR_POINTS[index]
             player.clear("wg_animator_spawned")
             player.message("You gain ${ARMOR_POINTS[index]} Warriors Guild points.")
             updateWarriorPointsInterface(player)
@@ -184,14 +217,14 @@ class WarriorsGuild : Script {
     }
 
     /**
-     * Updates the Warriors Guild interface overlay with the player's current animated armour points.
-     * Uses varbit 8662 to send the point count to the client (matching Lotica implementation).
+     * Updates the Warriors Guild interface overlay with the player's current combat tokens.
+     * Uses varbit 8665 to send the combat token count to the client (matching darkan implementation).
      *
      * @param player The player to update the interface for
      */
     private fun updateWarriorPointsInterface(player: Player) {
-        val points = player.get("wg_animator_points", 0)
-        player.client?.sendVarbit(8662, points)
+        val points = player.get("wg_points_combat", 0)
+        player.client?.sendVarbit(8665, points)
     }
 
     /**

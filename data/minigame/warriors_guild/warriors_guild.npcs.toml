@@ -73,9 +73,11 @@ str = 65
 def = 35
 style = "crush"
 max_hit_melee = 70
-hunt_mode = "cowardly"
+attack_bonus = 22
+combat_def = "cyclops_warriors_guild"
 slayer_xp = 100.0
-categories = ["hill_giants"]
+categories = ["cyclops"]
+drop_table = "cyclops_warriors_guild"
 respawn_delay = 30
 examine = "A one-eyed woman eater."
 
@@ -87,9 +89,11 @@ str = 50
 def = 46
 style = "crush"
 max_hit_melee = 60
-hunt_mode = "cowardly"
+attack_bonus = 22
+combat_def = "cyclops_warriors_guild"
 slayer_xp = 55.0
-categories = ["hill_giants"]
+categories = ["cyclops"]
+drop_table = "cyclops_warriors_guild"
 respawn_delay = 30
 examine = "A one-eyed man eater."
 

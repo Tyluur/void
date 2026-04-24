@@ -1,7 +1,6 @@
 [animated_bronze_armour_drop_table]
 type = "all"
 drops = [
-    { id = "warrior_guild_token", amount = 5 },
     { table = "animated_bronze_armour_helm" },
     { table = "animated_bronze_armour_body" },
     { table = "animated_bronze_armour_legs" },
@@ -28,7 +27,6 @@ drops = [
 [animated_iron_armour_drop_table]
 type = "all"
 drops = [
-    { id = "warrior_guild_token", amount = 10 },
     { id = "iron_full_helm" },
     { id = "iron_platebody" },
     { table = "animated_iron_armour_secondary" },
@@ -42,7 +40,6 @@ drops = [
 
 [animated_black_armour_drop_table]
 drops = [
-    { id = "warrior_guild_token", amount = 20 },
     { id = "black_full_helm" },
     { id = "black_platebody" },
     { id = "black_platelegs" },
@@ -51,7 +48,6 @@ drops = [
 [animated_steel_armour_drop_table]
 type = "all"
 drops = [
-    { id = "warrior_guild_token", amount = 15 },
     { table = "animated_steel_armour_secondary" },
     { id = "steel_platebody" },
     { id = "steel_platelegs" },
@@ -65,7 +61,6 @@ drops = [
 
 [animated_mithril_armour_drop_table]
 drops = [
-    { id = "warrior_guild_token", amount = 25 },
     { id = "mithril_full_helm" },
     { id = "mithril_platebody" },
     { id = "mithril_platelegs" },
@@ -73,7 +68,6 @@ drops = [
 
 [animated_adamant_armour_drop_table]
 drops = [
-    { id = "warrior_guild_token", amount = 30 },
     { id = "adamant_full_helm" },
     { id = "adamant_platebody" },
     { id = "adamant_platelegs" },
@@ -81,8 +75,41 @@ drops = [
 
 [animated_rune_armour_drop_table]
 drops = [
-    { id = "warrior_guild_token", amount = 40 },
     { id = "rune_full_helm" },
     { id = "rune_platebody" },
     { id = "rune_platelegs" },
+]
+
+[cyclops_warriors_guild_drop_table]
+type = "all"
+drops = [
+    { id = "big_bones" },
+    { table = "cyclops_warriors_guild_secondary" },
+]
+
+[cyclops_warriors_guild_secondary]
+roll = 100
+drops = [
+    { id = "iron_2h_sword", chance = 2 },
+    { id = "steel_2h_sword", chance = 2 },
+    { id = "steel_battleaxe", chance = 2 },
+    { id = "steel_dagger", chance = 2 },
+    { id = "steel_longsword", chance = 2 },
+    { id = "steel_mace", chance = 2 },
+    { id = "steel_med_helm", chance = 2 },
+    { id = "steel_scimitar", chance = 2 },
+    { id = "steel_sword", chance = 2 },
+    { id = "black_2h_sword", chance = 2 },
+    { id = "black_longsword", chance = 2 },
+    { id = "black_sword", chance = 2 },
+    { id = "mithril_2h_sword", chance = 2 },
+    { id = "mithril_longsword", chance = 2 },
+    { id = "adamant_2h_sword", chance = 2 },
+    { id = "adamant_mace", chance = 2 },
+    { id = "rune_2h_sword", chance = 1 },
+    { id = "rune_longsword", chance = 1 },
+    { id = "rune_med_helm", chance = 1 },
+    { table = "herb_drop_table", chance = 3 },
+    { id = "coins", min = 3, max = 442, chance = 40 },
+    { table = "gem_drop_table", chance = 2 },
 ]

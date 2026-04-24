@@ -8,6 +8,30 @@ id = 411
 [warriors_guild_cyclops_selection]
 id = 1058
 
+[.last_single]
+id = 2
+
+[.all_types]
+id = 3
+
+[.balance]
+id = 22
+
+[.strength]
+id = 23
+
+[.combat]
+id = 24
+
+[.attack]
+id = 25
+
+[.defence]
+id = 26
+
+[.enter]
+id = 44
+
 [warriors_guild_shotput_info]
 id = 412
 
