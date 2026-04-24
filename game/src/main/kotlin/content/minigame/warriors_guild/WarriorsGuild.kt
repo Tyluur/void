@@ -217,14 +217,25 @@ class WarriorsGuild : Script {
     }
 
     /**
-     * Updates the Warriors Guild interface overlay with the player's current combat tokens.
-     * Uses varbit 8665 to send the combat token count to the client (matching darkan implementation).
+     * Updates the Warriors Guild interface overlay with the player's current Warriors Guild points.
+     * Sends all token types to their corresponding varbits (matching darkan implementation).
      *
      * @param player The player to update the interface for
      */
     private fun updateWarriorPointsInterface(player: Player) {
-        val points = player.get("wg_points_combat", 0)
-        player.client?.sendVarbit(8665, points)
+        // Varbit IDs for displaying token counts on overlay/interface
+        // Matches darkan implementation: 8662-8666
+        val balancePoints = player.get("wg_points_barrels", 0)
+        val strengthPoints = player.get("wg_points_strength", 0)
+        val attackPoints = player.get("wg_points_attack", 0)
+        val combatPoints = player.get("wg_points_combat", 0)
+        val defencePoints = player.get("wg_points_defence", 0)
+
+        player.client?.sendVarbit(8666, balancePoints)  // Balance
+        player.client?.sendVarbit(8662, strengthPoints)  // Strength
+        player.client?.sendVarbit(8664, attackPoints)   // Attack
+        player.client?.sendVarbit(8665, combatPoints)   // Combat
+        player.client?.sendVarbit(8663, defencePoints)  // Defence
     }
 
     /**
