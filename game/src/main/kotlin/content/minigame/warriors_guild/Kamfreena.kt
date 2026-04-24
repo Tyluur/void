@@ -8,17 +8,12 @@ import world.gregs.voidps.engine.client.ui.open
 
 class Kamfreena : Script {
 
-    private val logger = InlineLogger()
-
     init {
-        logger.info { "Kamfreena class loaded" }
-
         /**
          * Handles Kamfreena dialogue for cyclops room entry.
          * Ported from Darkan's implementation.
          */
         npcOperate("Talk-to", "kamfreena") {
-            logger.info { "Kamfreena dialogue triggered" }
             val defender = WarriorsGuild.getBestDefender(this)
             if (defender == "bronze_defender") {
                 npc<Neutral>("It seems that you do not have a defender.")
