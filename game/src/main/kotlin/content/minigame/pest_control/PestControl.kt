@@ -1283,9 +1283,14 @@ class PestControl : Script {
         val knightHP = gameData.knightNPC?.levels?.get(Skill.Constitution) ?: gameData.knightHealth
         player.interfaces.sendText("pest_control_playing", "knight_health", "$knightHP")
 
-        // Update player damage/activity display
+        // Update player damage/activity display with color coding (like matrix4)
         val playerDamage = gameData.playerDamage[player] ?: 0
-        player.interfaces.sendText("pest_control_playing", "activity", "$playerDamage")
+        val damageText = if (playerDamage > 750) {
+            "<col=75AE49>$playerDamage"
+        } else {
+            "$playerDamage"
+        }
+        player.interfaces.sendText("pest_control_playing", "activity", damageText)
 
         // Update portal health displays (components 13-16)
         for (i in 0 until 4) {
@@ -1343,10 +1348,10 @@ class PestControl : Script {
         val points = gameData.difficultyConfig.rewardPoints
 
         for (player in gameData.players) {
+            player.remove<Boolean>("pest_control_game_active")
             player.interfaces.close("pest_control_playing")
             player.clearInstance()
             player.remove<String>("pest_control_difficulty")
-            player.remove<Boolean>("pest_control_game_active")
 
             if (won) {
                 val currentPoints = player["pest_control_points", 0]
