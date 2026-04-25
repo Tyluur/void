@@ -985,11 +985,11 @@ clone = "torcher_level_49"
 
 [torcher_level_66]
 id = 3756
-hitpoints = 450
+hitpoints = 420
 att = 0
 str = 0
 def = 57
-mage = 85
+mage = 86
 range = 0
 style = "ranged_magic"
 max_hit_melee = 90
@@ -1002,11 +1002,11 @@ clone = "torcher_level_66"
 
 [torcher_level_79]
 id = 3758
-hitpoints = 570
+hitpoints = 540
 att = 0
 str = 0
 def = 73
-mage = 97
+mage = 102
 range = 0
 style = "ranged_magic"
 max_hit_melee = 110
@@ -1019,11 +1019,11 @@ clone = "torcher_level_79"
 
 [torcher_level_91]
 id = 3760
-hitpoints = 710
+hitpoints = 660
 att = 0
 str = 0
 def = 89
-mage = 107
+mage = 118
 range = 0
 style = "ranged_magic"
 max_hit_melee = 120
@@ -1032,11 +1032,11 @@ combat_def = "torcher"
 
 [torcher_level_92]
 id = 3761
-hitpoints = 710
+hitpoints = 680
 att = 0
 str = 0
-def = 89
-mage = 107
+def = 93
+mage = 120
 range = 0
 style = "ranged_magic"
 max_hit_melee = 120

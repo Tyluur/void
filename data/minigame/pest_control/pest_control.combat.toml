@@ -1,0 +1,94 @@
+[brawler]
+attack_speed = 4
+retreat_range = 8
+defend_anim = "brawler_defend"
+death_anim = "brawler_death"
+
+[brawler.melee]
+range = 1
+anim = "brawler_attack"
+target_hit = { offense = "crush", max = 70 }
+approach = false
+
+[defiler]
+attack_speed = 4
+retreat_range = 8
+defend_anim = "defiler_defend"
+death_anim = "defiler_death"
+
+[defiler.range]
+range = 8
+anim = "defiler_attack"
+projectile = "defiler_spine"
+target_hit = { offense = "range", max = 60 }
+approach = false
+
+[ravager]
+attack_speed = 4
+retreat_range = 8
+defend_anim = "ravager_defend"
+death_anim = "ravager_death"
+
+[ravager.melee]
+range = 1
+anim = "ravager_attack"
+target_hit = { offense = "crush", max = 70 }
+approach = false
+
+[shifter]
+attack_speed = 4
+retreat_range = 8
+defend_anim = "shifter_defend"
+death_anim = "shifter_death"
+
+[shifter.melee]
+range = 1
+anim = "shifter_attack"
+target_hit = { offense = "stab", max = 50 }
+approach = false
+
+[spinner]
+attack_speed = 4
+retreat_range = 8
+defend_anim = "spinner_defend"
+death_anim = "spinner_death"
+
+[spinner.melee]
+range = 1
+anim = "spinner_attack"
+target_hit = { offense = "crush", max = 30 }
+approach = false
+
+[splatter]
+attack_speed = 4
+retreat_range = 8
+defend_anim = "splatter_defend"
+death_anim = "splatter_death"
+
+[splatter.melee]
+range = 1
+anim = "splatter_attack"
+target_hit = { offense = "crush", max = 30 }
+approach = false
+
+[torcher]
+attack_speed = 4
+retreat_range = 8
+defend_anim = "torcher_defend"
+death_anim = "torcher_death"
+
+[torcher.magic]
+range = 8
+anim = "torcher_attack"
+projectile = "torcher_fire"
+target_hit = { offense = "magic", max = 60 }
+approach = false
+
+[void_knight]
+attack_speed = 4
+retreat_range = 50
+death_anim = "void_knight_death"
+
+[void_knight.melee]
+range = 1
+target_hit = { offense = "crush", max = 0 }

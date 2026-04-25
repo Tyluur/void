@@ -50,13 +50,32 @@ class Attack(
                 val def = def(primaryTarget)
                 def["combat_def", get("transform_id", def.stringId)]
             } else {
-                get("transform_id", id)
+                transformDef["combat_def", id]
             }
-            val definition = definitions.getOrNull(defId) ?: return@npcCombatSwing
-            if (definition.attacks.isEmpty()) {
+            if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                println("ATTACK: defId=$defId")
+            }
+            val definition = definitions.getOrNull(defId) ?: run {
+                if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                    println("ATTACK: Combat definition not found for defId=$defId")
+                }
                 return@npcCombatSwing
             }
-            var attack = selectAttack(this, primaryTarget, definition) ?: return@npcCombatSwing
+            if (definition.attacks.isEmpty()) {
+                if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                    println("ATTACK: Combat definition has no attacks, defId=$defId")
+                }
+                return@npcCombatSwing
+            }
+            var attack = selectAttack(this, primaryTarget, definition) ?: run {
+                if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                    println("ATTACK: selectAttack returned null, defId=$defId")
+                }
+                return@npcCombatSwing
+            }
+            if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                println("ATTACK: Selected attack=${attack.id}, approach=${attack.approach}, range=${attack.range}")
+            }
             // Source
             play(attack.anim)
             play(attack.gfx)
@@ -65,14 +84,26 @@ class Attack(
                 say(attack.say)
             }
             if (attack.approach) {
+                if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                    println("ATTACK: Attack requires approach, checking if arrived")
+                }
                 if ((mode as CombatMovement).arrived(if (attack.range == 1) -1 else attack.range)) {
+                    if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                        println("ATTACK: Arrived at target, proceeding with attack")
+                    }
                     clear("attack_range")
                 } else {
+                    if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                        println("ATTACK: Not arrived at target, setting attack_range and returning")
+                    }
                     set("attack_range", attack.range)
                     set("next_attack", attack.id)
                     return@npcCombatSwing
                 }
             } else {
+                if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                    println("ATTACK: Attack does not require approach, proceeding")
+                }
                 clear("attack_range")
             }
             val targets = targets(primaryTarget, attack.multiTargetArea, attack.multiTargetRadius, attack.multiRadius)

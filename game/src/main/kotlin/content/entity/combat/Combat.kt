@@ -93,21 +93,33 @@ class Combat(val combatDefinitions: CombatDefinitions) :
 
     fun damage(character: Character, it: CombatDamage) {
         val (source, type) = it
+        // Debug logging for void knight receiving damage
         if (character is NPC && character.id == "void_knight") {
-            logger.debug { "VOID KNIGHT DAMAGE: source=$source, type=$type, current hp=${character.levels.get(Skill.Constitution)}, mode=${character.mode}, dead=${character.dead}" }
+            val sourceId = when (source) {
+                is NPC -> source.id
+                is Player -> source.name
+                else -> "unknown"
+            }
+            logger.debug { "DAMAGE HANDLER: void_knight receiving damage from source=${source::class.simpleName}($sourceId), type=$type, damage=${it.damage}" }
         }
+        
         if (source == character || type == "poison" || type == "disease" || type == "healed") {
             if (character is NPC && character.id == "void_knight") {
-                logger.debug { "VOID KNIGHT: Skipping damage - source=$source, type=$type" }
+                logger.debug { "DAMAGE HANDLER SKIPPED: void_knight damage skipped (source==character or poison/disease/healed)" }
             }
             return
         }
-        // Void knight doesn't retaliate - skip retaliation only, not damage processing
-        val skipRetaliation = character is NPC && character.id == "void_knight"
-        if (skipRetaliation) {
-            logger.debug { "VOID KNIGHT: Skipping retaliation" }
+        
+        // Void knight: Apply damage directly to constitution (no retaliation)
+        if (character is NPC && character.id == "void_knight") {
+            logger.debug { "DAMAGE HANDLER: Applying ${it.damage} damage to void_knight, current constitution=${character.levels.get(Skill.Constitution)}" }
+            character.levels.set(Skill.Constitution, character.levels.get(Skill.Constitution) - it.damage)
+            logger.debug { "DAMAGE HANDLER: void_knight constitution after damage=${character.levels.get(Skill.Constitution)}" }
+            return
         }
-        if (!skipRetaliation && character.mode !is CombatMovement && character.mode !is PauseMode) {
+        
+        // Normal damage flow for other NPCs
+        if (character.mode !is CombatMovement && character.mode !is PauseMode) {
             retaliate(character, source)
         }
     }
@@ -132,6 +144,10 @@ class Combat(val combatDefinitions: CombatDefinitions) :
 
     fun retaliate(character: Character, source: Character) {
         if (character.dead || character.levels.get(Skill.Constitution) <= 0 || !retaliates(character)) {
+            return
+        }
+        // Void knight never retaliates
+        if (character is NPC && character.id == "void_knight") {
             return
         }
         if (character is Player && character.mode != EmptyMode) {
@@ -162,9 +178,11 @@ class Combat(val combatDefinitions: CombatDefinitions) :
         val logger = InlineLogger()
 
         fun combat(character: Character, target: Character) {
-            if (target is NPC && target.id == "void_knight") {
-                logger.debug { "VOID KNIGHT combat() called: attacker=$character, target=$target, attacker.mode=${character.mode}, attacker.target=${character.target}" }
+            // Debug logging for NPC attacking void knight
+            if (character is NPC && target is NPC && target.id == "void_knight") {
+                logger.debug { "COMBAT ATTEMPT: NPC ${character.id} attempting to attack void_knight, character.mode=${character.mode}, character.target=${character.target}" }
             }
+            
             if (character.mode !is CombatMovement || character.target != target) {
                 character.mode = CombatMovement(character, target)
                 character.target = target
@@ -174,22 +192,25 @@ class Combat(val combatDefinitions: CombatDefinitions) :
                 return
             }
             if (character.target == null || !Target.attackable(character, target)) {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "VOID KNIGHT: Target not attackable or null, setting EmptyMode" }
+                if (character is NPC && target is NPC && target.id == "void_knight") {
+                    logger.debug { "COMBAT REJECTED: Target.attackable returned false for NPC ${character.id} -> void_knight" }
                 }
                 character.mode = EmptyMode
                 return
             }
             val attackRange = character.attackRange
+            if (character is NPC && target is NPC && target.id == "void_knight") {
+                logger.debug { "COMBAT CHECK: NPC ${character.id} attackRange=$attackRange, distance to target=${character.tile.distanceTo(target.tile)}" }
+            }
             if (!movement.arrived(if (attackRange == 1 && character.weapon.def["weapon_type", ""] != "salamander") -1 else attackRange)) {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "VOID KNIGHT: Not arrived at target yet" }
+                if (character is NPC && target is NPC && target.id == "void_knight") {
+                    logger.debug { "COMBAT REJECTED: NPC ${character.id} not arrived at target (movement.arrived returned false)" }
                 }
                 return
             }
             if (character.hasClock("action_delay")) {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "VOID KNIGHT: Has action delay clock" }
+                if (character is NPC && target is NPC && target.id == "void_knight") {
+                    logger.debug { "COMBAT REJECTED: NPC ${character.id} has action_delay clock" }
                 }
                 return
             }
@@ -200,8 +221,8 @@ class Combat(val combatDefinitions: CombatDefinitions) :
                 else -> return
             }
             if (!prepared) {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "VOID KNIGHT: Combat not prepared" }
+                if (character is NPC && target is NPC && target.id == "void_knight") {
+                    logger.debug { "COMBAT REJECTED: CombatApi.prepare returned false for NPC ${character.id} -> void_knight" }
                 }
                 character.mode = EmptyMode
                 return
@@ -230,9 +251,12 @@ class Combat(val combatDefinitions: CombatDefinitions) :
             target.start("under_attack", 8)
             if (character is NPC) {
                 if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "VOID KNIGHT: About to call CombatApi.swing" }
+                    logger.debug { "COMBAT SWING: NPC ${character.id} about to swing at void_knight" }
                 }
                 CombatApi.swing(character, target, character.fightStyle)
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "COMBAT SWING COMPLETED: NPC ${character.id} swing at void_knight completed" }
+                }
             } else if (character is Player) {
                 val style = character.fightStyle
                 if (style == "magic" || style == "blaze") {

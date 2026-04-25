@@ -34,62 +34,76 @@ import world.gregs.voidps.network.login.protocol.visual.update.player.EquipSlot
 
 object Target {
     private val logger = InlineLogger()
-
+    
     fun attackable(source: Character, target: Character): Boolean {
+        // Debug logging for void knight targeting
         if (target is NPC && target.id == "void_knight") {
-            logger.debug { "TARGET.attackable for void_knight: source=$source, target=$target, target.dead=${target.dead}, target.index=${target.index}" }
+            val sourceId = when (source) {
+                is NPC -> source.id
+                is Player -> source.name
+                else -> "unknown"
+            }
+            logger.debug { "TARGET CHECK: source=${source::class.simpleName}($sourceId), target=void_knight, target.mode=${target.mode}, target.dead=${target.dead}, target.index=${target.index}" }
         }
+        
         if (target is NPC) {
+            // Edge case: Void knight in Pest Control should be attackable by NPCs regardless of options
+            if (target.id == "void_knight" && source is NPC) {
+                logger.debug { "TARGET CHECK APPROVED: void_knight is attackable by NPC ${source.id} (edge case)" }
+                return true
+            }
+            
             if (target.id.startsWith("door_support") && NPCDefinitions.get(target.id).options[1] == "Destroy") {
                 return true
             }
-            // Void Knight in Pest Control is attackable by pests (NPCs) but not players
-            if (target.id == "void_knight" && source is NPC) {
-                logger.debug { "TARGET: void_knight is attackable by NPC" }
-                return true
-            }
             if (source is Player && !CombatApi.canAttack(source, target)) {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "TARGET: void_knight - Player cannot attack" }
+                if (target.id == "void_knight") {
+                    logger.debug { "TARGET CHECK REJECTED: Player source cannot attack void_knight (CombatApi.canAttack returned false)" }
                 }
                 return false
             }
             if (target.transform != "") {
                 if (!NPCDefinitions.get(target.transform).options.contains("Attack")) {
-                    if (target is NPC && target.id == "void_knight") {
-                        logger.debug { "TARGET: void_knight - No Attack option in transform" }
+                    if (target.id == "void_knight") {
+                        logger.debug { "TARGET CHECK REJECTED: void_knight transform options don't contain Attack" }
                     }
                     return false
                 }
             } else if (target.def.options[1] != "Attack") {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "TARGET: void_knight - No Attack option in def" }
+                if (target.id == "void_knight") {
+                    logger.debug { "TARGET CHECK REJECTED: void_knight def.options[1] != 'Attack', value=${target.def.options[1]}" }
                 }
                 return false
             }
             if (target.mode == PauseMode) {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "TARGET: void_knight - In PauseMode" }
+                if (target.id == "void_knight") {
+                    logger.debug { "TARGET CHECK REJECTED: void_knight is in PauseMode" }
                 }
                 return false
             }
             if (target.index == -1) {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "TARGET: void_knight - Index is -1" }
+                if (target.id == "void_knight") {
+                    logger.debug { "TARGET CHECK REJECTED: void_knight.index == -1" }
                 }
                 return false
             }
             if (NPCs.indexed(target.index) == null) {
-                if (target is NPC && target.id == "void_knight") {
-                    logger.debug { "TARGET: void_knight - Not indexed" }
+                if (target.id == "void_knight") {
+                    logger.debug { "TARGET CHECK REJECTED: NPCs.indexed(target.index) == null for void_knight" }
                 }
                 return false
             }
         }
         if (source.tile.level != target.tile.level) {
+            if (target is NPC && target.id == "void_knight") {
+                logger.debug { "TARGET CHECK REJECTED: source.level=${source.tile.level} != target.level=${target.tile.level}" }
+            }
             return false
         }
         if (source.dead || target.dead || source["logged_out", false] || target["logged_out", false]) {
+            if (target is NPC && target.id == "void_knight") {
+                logger.debug { "TARGET CHECK REJECTED: source.dead=${source.dead}, target.dead=${target.dead}, source.logged_out=${source["logged_out", false]}, target.logged_out=${target["logged_out", false]}" }
+            }
             return false
         }
         if (source is Player && target is Player) {
@@ -115,7 +129,6 @@ object Target {
         }
         // Spinners in Pest Control should never attack players - they prioritize healing portals
         if (source is NPC && source.id.contains("spinner") && target is Player) {
-            logger.debug { "TARGET: Spinner ${source.id} prevented from attacking player ${target.name}" }
             return false
         }
         // If the target I'm trying to attack is already in combat and I am not the attacker
@@ -125,14 +138,28 @@ object Target {
             } else {
                 (source as? Player)?.message("That player is already under attack.")
             }
+            if (target is NPC && target.id == "void_knight") {
+                logger.debug { "TARGET CHECK REJECTED: void_knight in single combat with different attacker" }
+            }
             return false
         }
         // If I am already in combat and my attempted target is not my attacker
         if (source.inSingleCombat && source.underAttack && source.attacker != target) {
             (source as? Player)?.message("You are already in combat.")
+            if (target is NPC && target.id == "void_knight") {
+                logger.debug { "TARGET CHECK REJECTED: source in single combat with different target" }
+            }
             return false
         }
         // PVP area, slayer requirements, in combat etc..
+        if (target is NPC && target.id == "void_knight") {
+            val sourceId = when (source) {
+                is NPC -> source.id
+                is Player -> source.name
+                else -> "unknown"
+            }
+            logger.debug { "TARGET CHECK APPROVED: void_knight is attackable by ${source::class.simpleName}($sourceId)" }
+        }
         return true
     }
 

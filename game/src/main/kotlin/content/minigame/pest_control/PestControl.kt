@@ -131,10 +131,11 @@ class PestControl : Script {
     init {
         // Handle void knight damage - allow damage from pests
         npcCombatDamage("void_knight") { damage ->
-            log.debug { "VOID KNIGHT damage handler called: source=${damage.source}, type=${damage.type}, damage=${damage.damage}" }
+            log.info { "VOID KNIGHT DAMAGE HANDLER: source=${damage.source}, type=${damage.type}, damage=${damage.damage}" }
+            log.info { "VOID KNIGHT DAMAGE HANDLER: Before damage - constitution=${this.levels.get(Skill.Constitution)}" }
             // Apply damage directly to the void knight
             this.levels.set(Skill.Constitution, this.levels.get(Skill.Constitution) - damage.damage)
-            log.debug { "VOID KNIGHT HP after damage: ${this.levels.get(Skill.Constitution)}" }
+            log.info { "VOID KNIGHT DAMAGE HANDLER: After damage - constitution=${this.levels.get(Skill.Constitution)}" }
         }
 
         // Re-open Pest Control overlay if it's closed while game is active
@@ -649,19 +650,19 @@ class PestControl : Script {
             if (get("pest_control_game_active", false)) {
                 val gameData = activeGames[this]
                 if (gameData != null) {
-                    gameData.players.remove(this)
-                    if (gameData.players.isEmpty()) {
-                        endGame(gameData, false)
+                    // Teleport player to entrance point instead of removing them
+                    val diffConfig = difficultyConfig(difficultyName)
+                    if (diffConfig != null) {
+                        val entranceTile = Tile(diffConfig.exitTileX, diffConfig.exitTileY, diffConfig.exitTileLevel)
+                        tele(entranceTile)
+                        message("Oh dear, you died! You have been returned to the entrance.", ChatType.Game)
                     }
+                    // Keep player in the game, don't remove them
+                    // Don't end the game if players die - only end if knight dies or time runs out
                 }
-                activeGames.remove(this)
-                gameTimers.remove(this)
-                pestSpawnTimers.remove(this)
-                shieldDropTimers.remove(this)
-                clearInstance()
-                this.interfaces.close("pest_control_waiting")
+                // Don't remove player from active games - they can re-enter
+                // Just clear their game state so they can re-enter
                 this.interfaces.close("pest_control_playing")
-                this.clear("pest_control_difficulty")
                 this.clear("pest_control_game_active")
             }
         }
@@ -1039,45 +1040,48 @@ class PestControl : Script {
                 }
             }
 
-            // Make pests attack the Void Knight
+            // Make pests attack the Void Knight (matrix4-style: 33% chance to target knight, otherwise target players)
             val knight = gameData.knightNPC
-            log.debug {
-                "PEST TARGETING: knight=$knight, knight.index=${knight?.index}, knight.dead=${knight?.dead}, knight.hp=${
-                    knight?.levels?.get(
-                        Skill.Constitution
-                    )
-                }"
-            }
             if (knight != null && knight.index != -1) {
                 gameData.pests.removeAll { it.index == -1 || it.dead }
-                log.debug { "PEST TARGETING: Active pests: ${gameData.pests.size}" }
+                log.debug { "PEST TARGETING: Processing ${gameData.pests.size} active pests, knight=$knight, knight.index=${knight.index}, knight.dead=${knight.dead}" }
                 for (pest in gameData.pests) {
                     if (pest.index == -1 || pest.dead) continue
-                    if (pest.underAttack) continue
                     val alreadyTargetingKnight =
                         pest.mode is CombatMovement && (pest.mode as CombatMovement).target == knight
-                    if (alreadyTargetingKnight) continue
+                    if (alreadyTargetingKnight) {
+                        log.debug { "PEST TARGETING: Pest ${pest.id} already targeting knight, skipping" }
+                        continue
+                    }
                     val pestId = pest.id
                     // Skip spinners - they prioritize healing their portal
-                    if (pestId.contains("spinner")) continue
-                    log.debug { "PEST TARGETING: Checking pest=$pestId, underAttack=${pest.underAttack}, mode=${pest.mode}" }
-                    when {
-                        pestId.startsWith("defiler_") -> {
-                            log.debug { "PEST TARGETING: Directing defiler $pestId to attack knight" }
-                            combat(pest, knight)
+                    if (pestId.contains("spinner")) {
+                        log.debug { "PEST TARGETING: Pest ${pest.id} is spinner, skipping (prioritizes portal healing)" }
+                        continue
+                    }
+                    
+                    // Matrix4-style targeting: 33% chance to target knight, otherwise target nearby players
+                    val targetKnight = random.nextInt(3) == 0
+                    log.debug { "PEST TARGETING: Pest ${pest.id} roll: targetKnight=$targetKnight (random=${random.nextInt(3)}), pest.mode=${pest.mode}, pest.underAttack=${pest.underAttack}" }
+                    
+                    if (targetKnight) {
+                        log.debug { "PEST TARGETING: Directing pest ${pest.id} to attack void_knight" }
+                        combat(pest, knight)
+                    } else {
+                        // Find and attack nearby players
+                        val nearbyPlayer = gameData.players.firstOrNull { player ->
+                            !player.dead && player.tile.distanceTo(pest.tile) <= 10
                         }
-
-                        pestId.startsWith("torcher_") -> {
-                            log.debug { "PEST TARGETING: Directing torcher $pestId to attack knight" }
-                            combat(pest, knight)
-                        }
-
-                        pestId.startsWith("shifter_") && random.nextInt(50) < 2 -> {
-                            log.debug { "PEST TARGETING: Directing shifter $pestId to attack knight" }
-                            combat(pest, knight)
+                        if (nearbyPlayer != null) {
+                            log.debug { "PEST TARGETING: Directing pest ${pest.id} to attack player ${nearbyPlayer.name} (distance=${pest.tile.distanceTo(nearbyPlayer.tile)})" }
+                            combat(pest, nearbyPlayer)
+                        } else {
+                            log.debug { "PEST TARGETING: Pest ${pest.id} found no nearby players within distance 10" }
                         }
                     }
                 }
+            } else {
+                log.debug { "PEST TARGETING: No valid knight to target (knight=$knight, knight.index=${knight?.index})" }
             }
 
             // Spawn pests when timer reaches 0
@@ -1275,7 +1279,9 @@ class PestControl : Script {
     private fun updateGameInterface(player: Player, gameData: PestGameData) {
         val minutesLeft = gameData.timeRemaining / 60
         player.interfaces.sendText("pest_control_playing", "time", "$minutesLeft min")
-        player.interfaces.sendText("pest_control_playing", "knight_health", "${gameData.knightHealth}")
+        // Use actual Constitution level from the knight NPC for accurate display
+        val knightHP = gameData.knightNPC?.levels?.get(Skill.Constitution) ?: gameData.knightHealth
+        player.interfaces.sendText("pest_control_playing", "knight_health", "$knightHP")
 
         // Update player damage/activity display
         val playerDamage = gameData.playerDamage[player] ?: 0

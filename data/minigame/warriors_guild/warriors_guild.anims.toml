@@ -1,0 +1,29 @@
+[animated_armour_spawn]
+id = 4166
+
+[catapult]
+id = 4164
+
+[catapult_projectile]
+id = 4165
+
+[defensive_1]
+id = 4168
+
+[defensive_2]
+id = 4169
+
+[defensive_3]
+id = 4170
+
+[defensive_4]
+id = 4171
+
+[cyclops_wg_attack]
+id = 4652
+
+[cyclops_wg_defend]
+id = 4651
+
+[cyclops_wg_death]
+id = 4653
