@@ -202,11 +202,23 @@ class Combat(val combatDefinitions: CombatDefinitions) :
             if (character is NPC && target is NPC && target.id == "void_knight") {
                 logger.debug { "COMBAT CHECK: NPC ${character.id} attackRange=$attackRange, distance to target=${character.tile.distanceTo(target.tile)}" }
             }
-            if (!movement.arrived(if (attackRange == 1 && character.weapon.def["weapon_type", ""] != "salamander") -1 else attackRange)) {
-                if (character is NPC && target is NPC && target.id == "void_knight") {
-                    logger.debug { "COMBAT REJECTED: NPC ${character.id} not arrived at target (movement.arrived returned false)" }
+            // For ranged attacks (attackRange > 1), check if within range instead of requiring movement.arrived()
+            // This allows torchers/defilers to attack from distance like in 2009scape/matrix4
+            if (attackRange == 1) {
+                if (!movement.arrived(-1)) {
+                    if (character is NPC && target is NPC && target.id == "void_knight") {
+                        logger.debug { "COMBAT REJECTED: NPC ${character.id} not arrived at target (movement.arrived returned false)" }
+                    }
+                    return
                 }
-                return
+            } else {
+                // For ranged attacks, check if within attack range
+                if (!character.tile.within(target.tile, attackRange)) {
+                    if (character is NPC && target is NPC && target.id == "void_knight") {
+                        logger.debug { "COMBAT REJECTED: NPC ${character.id} not within attack range (distance=${character.tile.distanceTo(target.tile)}, range=$attackRange)" }
+                    }
+                    return
+                }
             }
             if (character.hasClock("action_delay")) {
                 if (character is NPC && target is NPC && target.id == "void_knight") {
