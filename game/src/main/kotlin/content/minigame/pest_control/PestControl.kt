@@ -1378,6 +1378,7 @@ class PestControl : Script {
      * @return True if logout should proceed, false otherwise
      */
     private fun handleLogout(player: Player): Boolean {
+        // Ensure pest_control_points is persisted (attributes are automatically saved in void)
         val difficultyName = player.get("pest_control_difficulty", "")
         if (difficultyName.isEmpty()) {
             return true
@@ -1402,7 +1403,7 @@ class PestControl : Script {
             return true
         }
 
-        if (player.get("pest_control_game_active", false)) {
+        if (player["pest_control_game_active", false]) {
             // Clean up instance and game state
             val gameData = activeGames[player]
             if (gameData != null) {

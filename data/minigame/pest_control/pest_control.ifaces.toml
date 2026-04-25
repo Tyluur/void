@@ -1,5 +1,65 @@
 [pest_control_rewards]
-id = 267
+id = 1011
+
+[.commendations]
+id = 61
+
+[.attack_xp_1]
+id = 68
+
+[.attack_xp_10]
+id = 86
+
+[.attack_xp_100]
+id = 88
+
+[.void_top]
+id = 15
+
+[.void_robe]
+id = 196
+
+[.void_gloves]
+id = 208
+
+[.void_mace]
+id = 220
+
+[.void_ranger_helm]
+id = 232
+
+[.void_mage_helm]
+id = 244
+
+[.void_ranger_top]
+id = 256
+
+[.void_mage_top]
+id = 268
+
+[.void_seal]
+id = 280
+
+[.gold_charm]
+id = 324
+
+[.green_charm]
+id = 339
+
+[.crimson_charm]
+id = 354
+
+[.blue_charm]
+id = 369
+
+[.herblore_pack]
+id = 291
+
+[.mineral_pack]
+id = 302
+
+[.seed_pack]
+id = 313
 
 [pest_control_waiting]
 id = 407
