@@ -3,6 +3,7 @@ package content.minigame.pest_control
 import com.github.michaelbull.logging.InlineLogger
 import content.entity.combat.Combat.Companion.combat
 import content.entity.combat.dead
+import content.entity.combat.hit.hit
 import content.entity.combat.underAttack
 import content.quest.clearInstance
 import content.quest.instanceOffset
@@ -161,6 +162,46 @@ class PestControl : Script {
             updateGameInterface(source, gameData)
         }
 
+        // Spinner portal healing - spinners heal their assigned portal when damaged
+        npcTimerTick("spinner_heal") {
+            val portalIndex = this["portal_index"] as? Int ?: return@npcTimerTick Timer.CONTINUE
+            val gameData = activeGames.values.find { it.pests.contains(this) } ?: return@npcTimerTick Timer.CONTINUE
+            val portal = gameData.portalNPCs[portalIndex]
+
+            if (portal == null || portal.index == -1 || portal.dead) {
+                return@npcTimerTick Timer.CONTINUE // Portal destroyed, stop healing
+            }
+
+            val portalMaxHP = gameData.portalBaseHealth
+            val currentHP = gameData.portalHealth[portalIndex]
+
+            // Only heal if portal is damaged
+            if (currentHP < portalMaxHP) {
+                val distance = tile.distanceTo(portal.tile)
+
+                if (distance <= 5) {
+                    // Within range - heal the portal by 10% of max HP
+                    val healAmount = portalMaxHP / 10
+                    gameData.portalHealth[portalIndex] = minOf(portalMaxHP, currentHP + healAmount)
+                    portal["hitpoints"] = gameData.portalHealth[portalIndex]
+
+                    // Play heal animation and graphics
+                    anim("spinner_heal")
+                    gfx("spinner_heal_graphics")
+
+                    // Update interface for all players
+                    for (player in gameData.players) {
+                        updateGameInterface(player, gameData)
+                    }
+                } else {
+                    // Not in range - move toward portal
+                    // The hunt system should handle movement, but we can add specific targeting
+                }
+            }
+
+            Timer.CONTINUE
+        }
+
         // Handle portal damage to update interface
         npcCombatDamage("portal_*") { damage ->
             log.info { "Portal damaged: ${this.id}, damage: $damage" }
@@ -205,6 +246,23 @@ class PestControl : Script {
 
                 // Restore 50 HP to Void Knight when portal destroyed
                 gameData.knightHealth = minOf(gameData.knightHealth + 50, gameData.difficultyConfig.knightHealth)
+
+                // Explode all spinners associated with this portal
+                val spinnersToExplode = gameData.pests.filter { it.id.contains("spinner") && (it["portal_index"] as? Int) == portalIndex }
+                for (spinner in spinnersToExplode) {
+                    npcTimerStop("spinner_heal") { } // Stop healing timer
+                    // Damage nearby players
+                    for (player in gameData.players) {
+                        if (spinner.tile.distanceTo(player.tile) <= 1) {
+                            // Apply poison damage to nearby players
+                            hit(player, offensiveType = "poison", damage = 5)
+                            // Apply poison effect (if poison system exists)
+                        }
+                    }
+                    // Remove spinner
+                    NPCs.remove(spinner)
+                    gameData.pests.remove(spinner)
+                }
 
                 // Update interface to show knight health restoration
                 for (player in gameData.players) {
@@ -1055,6 +1113,12 @@ class PestControl : Script {
                 if (pest.index != -1) {
                     gameData.pestCounts[index]++
                     pest["pest_control_spawn_index"] = index
+                    // Spinners need to know which portal they're assigned to for healing
+                    if (pest.id.contains("spinner")) {
+                        pest["portal_index"] = index
+                        // Start the healing timer for spinners
+                        npcTimerStart("spinner_heal") { 3 } // Check every 3 ticks
+                    }
                     gameData.pests.add(pest)
                     log.info { "Spawned pest $pestId at $pestTile for location $index (count: ${gameData.pestCounts[index]})" }
                 }
