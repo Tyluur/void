@@ -13,6 +13,7 @@ import world.gregs.config.Config
 import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.client.message
 import world.gregs.voidps.engine.entity.World
+import world.gregs.voidps.engine.entity.character.mode.EmptyMode
 import world.gregs.voidps.engine.entity.character.mode.combat.CombatMovement
 import world.gregs.voidps.engine.entity.character.move.tele
 import world.gregs.voidps.engine.entity.character.npc.NPCs
@@ -28,6 +29,9 @@ import world.gregs.voidps.type.Direction
 import world.gregs.voidps.type.Region
 import world.gregs.voidps.type.Tile
 import world.gregs.voidps.type.random
+import world.gregs.voidps.engine.map.collision.Collisions
+import org.rsmod.game.pathfinder.flag.CollisionFlag
+import world.gregs.voidps.engine.map.collision.check
 import java.util.concurrent.TimeUnit
 
 /**
@@ -133,6 +137,49 @@ class PestControl : Script {
             log.debug { "VOID KNIGHT HP after damage: ${this.levels.get(Skill.Constitution)}" }
         }
 
+        // Re-open Pest Control overlay if it's closed while game is active
+        interfaceClosed("pest_control_playing") {
+            // Check if player is still in an active game
+            if (this["pest_control_game_active"] as? Boolean == true) {
+                val gameData = activeGames[this]
+                if (gameData != null) {
+                    this.interfaces.open("pest_control_playing")
+                    updateGameInterface(this, gameData)
+                }
+            }
+        }
+
+        // Handle spinner taking damage - force it to prioritize healing over combat
+        npcCombatDamage("spinner_*") { damage ->
+            val spinner = this
+            log.debug { "SPINNER COMBAT: Spinner ${spinner.id} took damage from ${damage.source}, type=${damage.type}, damage=${damage.damage}" }
+            val portalIndex = spinner["portal_index"] as? Int ?: run {
+                log.debug { "SPINNER COMBAT: No portal_index attribute on spinner ${spinner.id}" }
+                return@npcCombatDamage
+            }
+            log.debug { "SPINNER COMBAT: portal_index=$portalIndex" }
+            val gameData = activeGames.values.find { it.pests.contains(spinner) } ?: run {
+                log.debug { "SPINNER COMBAT: No gameData found for spinner ${spinner.id}" }
+                return@npcCombatDamage
+            }
+            val portal = gameData.portalNPCs[portalIndex]
+            log.debug { "SPINNER COMBAT: portal=$portal, portal.index=${portal?.index}, portal.dead=${portal?.dead}" }
+
+            // Spinners ALWAYS prioritize healing their portal, never engage in combat
+            if (portal != null && portal.index != -1 && !portal.dead) {
+                log.debug { "SPINNER COMBAT: Canceling combat on spinner ${spinner.id} and walking to portal $portalIndex" }
+                log.debug { "SPINNER COMBAT: Current mode before cancel: ${spinner.mode}" }
+
+                // Immediately cancel combat and walk toward portal
+                spinner.mode = EmptyMode
+                spinner.walkTo(portal.tile)
+
+                log.debug { "SPINNER COMBAT: Mode after cancel: ${spinner.mode}, walking to ${portal.tile}" }
+            } else {
+                log.debug { "SPINNER COMBAT: Portal is null, index=-1, or dead, spinner can continue combat" }
+            }
+        }
+
         // Track player damage to NPCs for Pest Control interface
         npcCombatDamage { damage ->
             val source = damage.source
@@ -160,46 +207,6 @@ class PestControl : Script {
             log.debug { "Player ${source.name} dealt ${damage.damage} damage to ${target.id}, total: ${gameData.playerDamage[source]}" }
             // Update interface for this player
             updateGameInterface(source, gameData)
-        }
-
-        // Spinner portal healing - spinners heal their assigned portal when damaged
-        npcTimerTick("spinner_heal") {
-            val portalIndex = this["portal_index"] as? Int ?: return@npcTimerTick Timer.CONTINUE
-            val gameData = activeGames.values.find { it.pests.contains(this) } ?: return@npcTimerTick Timer.CONTINUE
-            val portal = gameData.portalNPCs[portalIndex]
-
-            if (portal == null || portal.index == -1 || portal.dead) {
-                return@npcTimerTick Timer.CONTINUE // Portal destroyed, stop healing
-            }
-
-            val portalMaxHP = gameData.portalBaseHealth
-            val currentHP = gameData.portalHealth[portalIndex]
-
-            // Only heal if portal is damaged
-            if (currentHP < portalMaxHP) {
-                val distance = tile.distanceTo(portal.tile)
-
-                if (distance <= 5) {
-                    // Within range - heal the portal by 10% of max HP
-                    val healAmount = portalMaxHP / 10
-                    gameData.portalHealth[portalIndex] = minOf(portalMaxHP, currentHP + healAmount)
-                    portal["hitpoints"] = gameData.portalHealth[portalIndex]
-
-                    // Play heal animation and graphics
-                    anim("spinner_heal")
-                    gfx("spinner_heal_graphics")
-
-                    // Update interface for all players
-                    for (player in gameData.players) {
-                        updateGameInterface(player, gameData)
-                    }
-                } else {
-                    // Not in range - move toward portal
-                    // The hunt system should handle movement, but we can add specific targeting
-                }
-            }
-
-            Timer.CONTINUE
         }
 
         // Handle portal damage to update interface
@@ -250,7 +257,6 @@ class PestControl : Script {
                 // Explode all spinners associated with this portal
                 val spinnersToExplode = gameData.pests.filter { it.id.contains("spinner") && (it["portal_index"] as? Int) == portalIndex }
                 for (spinner in spinnersToExplode) {
-                    npcTimerStop("spinner_heal") { } // Stop healing timer
                     // Damage nearby players
                     for (player in gameData.players) {
                         if (spinner.tile.distanceTo(player.tile) <= 1) {
@@ -880,6 +886,26 @@ class PestControl : Script {
         if (instanceTile != null) {
             spawnGameNPCs(gameData, instanceTile)
         }
+
+        // Debug mode: drop all shields and spawn all pests immediately
+        if (DEBUG_MODE) {
+            log.info { "DEBUG MODE: Dropping all shields and spawning all pests immediately" }
+            // Drop all 4 shields
+            repeat(4) {
+                dropPortalShield(gameData)
+            }
+            // Spawn all pests to max capacity (limit to avoid infinite loop)
+            val maxTotalPests = (maxPestsPerPortal * 4) + maxPestsNearKnight
+            var attempts = 0
+            while (gameData.pests.size < maxTotalPests && attempts < 200) {
+                spawnPests(gameData)
+                attempts++
+            }
+            log.info { "DEBUG MODE: Spawned ${gameData.pests.size} pests in $attempts attempts" }
+            for (player in players) {
+                player.message("DEBUG MODE: All shields dropped and ${gameData.pests.size} pests spawned!", ChatType.Game)
+            }
+        }
     }
 
     /**
@@ -943,6 +969,76 @@ class PestControl : Script {
                 pestSpawnTimers[player] = pestSpawnIntervalSeconds
             }
 
+            // Spinners prioritize healing their assigned portal - ALWAYS walk to portal, only heal if damaged
+            for (pest in gameData.pests) {
+                if (pest.index == -1 || pest.dead) continue
+                if (!pest.id.contains("spinner")) continue
+
+                log.debug { "SPINNER HEAL: Processing spinner ${pest.id}" }
+                val portalIndex = pest["portal_index"] as? Int ?: run {
+                    log.debug { "SPINNER HEAL: No portal_index on spinner ${pest.id}" }
+                    continue
+                }
+                log.debug { "SPINNER HEAL: portal_index=$portalIndex" }
+                val portal = gameData.portalNPCs[portalIndex]
+                if (portal == null || portal.index == -1 || portal.dead) {
+                    log.debug { "SPINNER HEAL: Portal is null, index=-1, or dead for spinner ${pest.id}" }
+                    // Portal dead - spinner should explode, handled elsewhere
+                    continue
+                }
+
+                val portalMaxHP = gameData.portalBaseHealth
+                val currentHP = gameData.portalHealth[portalIndex]
+                val portalLocked = gameData.shieldsDropped <= portalIndex
+
+                log.debug { "SPINNER HEAL: portal HP=$currentHP/$portalMaxHP, portalLocked=$portalLocked, shieldsDropped=${gameData.shieldsDropped}, mode=${pest.mode}" }
+
+                // Spinners ALWAYS cancel combat and walk toward their portal (regardless of HP state)
+                // Only cancel combat mode, don't interrupt movement
+                if (pest.mode is CombatMovement) {
+                    log.debug { "SPINNER HEAL: Canceling combat on spinner ${pest.id}" }
+                    pest.mode = EmptyMode
+                }
+                val distance = pest.tile.distanceTo(portal.tile)
+                log.debug { "SPINNER HEAL: Distance to portal=$distance" }
+
+                if (distance <= 5) { // 2009scape uses 5 tiles range
+                    // Only actually heal if portal is damaged and not locked
+                    if (!portalLocked && currentHP < portalMaxHP) {
+                        val healCounter = pest["healCounter"] as? Int ?: 0
+                        pest["healCounter"] = healCounter + 1
+                        log.debug { "SPINNER HEAL: healCounter=$healCounter -> ${healCounter + 1}" }
+                        if (healCounter >= 5) { // heal every 6 ticks (~3.6s)
+                            pest.face(portal.tile)
+                            val healAmount = (portalMaxHP * 0.10).toInt() // Heal 10% of max HP (matches 2009scape)
+                            val newHP = minOf(portalMaxHP, currentHP + healAmount)
+                            gameData.portalHealth[portalIndex] = newHP
+                            // Update both the attribute and the actual Constitution level (capped at max)
+                            portal["hitpoints"] = newHP
+                            portal.levels.set(Skill.Constitution, minOf(portalMaxHP, newHP))
+                            pest.anim("spinner_heal")
+                            pest.gfx("spinner_heal_graphics")
+                            pest["healCounter"] = 0
+                            log.debug { "SPINNER HEAL: Healed portal by $healAmount HP, new HP=$newHP/$portalMaxHP" }
+                            for (p in gameData.players) {
+                                updateGameInterface(p, gameData)
+                            }
+                        } else {
+                            log.debug { "SPINNER HEAL: Not healing yet, waiting for healCounter >= 5" }
+                        }
+                    } else {
+                        // Portal at full HP or locked - reset healCounter to prevent instant heal when damaged
+                        pest["healCounter"] = 0
+                        log.debug { "SPINNER HEAL: Portal not damaged or locked, waiting near portal (locked=$portalLocked, HP=$currentHP/$portalMaxHP)" }
+                    }
+                } else {
+                    log.debug { "SPINNER HEAL: Not in range, walking to portal" }
+                    pest.walkTo(portal.tile)
+                    // Reset healCounter when not in range to prevent instant heal when arriving
+                    pest["healCounter"] = 0
+                }
+            }
+
             // Make pests attack the Void Knight
             val knight = gameData.knightNPC
             log.debug {
@@ -962,6 +1058,8 @@ class PestControl : Script {
                         pest.mode is CombatMovement && (pest.mode as CombatMovement).target == knight
                     if (alreadyTargetingKnight) continue
                     val pestId = pest.id
+                    // Skip spinners - they prioritize healing their portal
+                    if (pestId.contains("spinner")) continue
                     log.debug { "PEST TARGETING: Checking pest=$pestId, underAttack=${pest.underAttack}, mode=${pest.mode}" }
                     when {
                         pestId.startsWith("defiler_") -> {
@@ -1063,6 +1161,45 @@ class PestControl : Script {
     }
 
     /**
+     * Checks if a tile is valid for spawning a pest.
+     * Ensures the tile is within instance bounds, walkable, and not occupied.
+     *
+     * @param tile The tile to check
+     * @param instanceTile The instance base tile
+     * @param portalTile The portal tile (to avoid spawning underneath)
+     * @param gameData The game state data
+     * @return true if the tile is valid for spawning
+     */
+    private fun isValidSpawnTile(tile: Tile, instanceTile: Tile, portalTile: Tile?, gameData: PestGameData): Boolean {
+        // Check if tile is within instance bounds (64x64 region)
+        val inInstance = tile.x >= instanceTile.x && tile.x < instanceTile.x + 64 &&
+                        tile.y >= instanceTile.y && tile.y < instanceTile.y + 64 &&
+                        tile.level == instanceTile.level
+        if (!inInstance) {
+            return false
+        }
+
+        // Check if tile is walkable (collision check)
+        if (Collisions.check(tile.x, tile.y, tile.level, CollisionFlag.FLOOR)) {
+            return false
+        }
+
+        // Check if tile is too close to portal (avoid spawning underneath)
+        if (portalTile != null && tile.distanceTo(portalTile) <= 1) {
+            return false
+        }
+
+        // Check if tile is occupied by another pest
+        for (pest in gameData.pests) {
+            if (pest.tile.distanceTo(tile) <= 1) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    /**
      * Spawns pests near active portals and knight.
      * Follows Matrix4 logic with pest count limits per location.
      *
@@ -1087,6 +1224,9 @@ class PestControl : Script {
             val baseOffset = if (index == 4) knightOffset else portalOffsets[index]
             val baseTile = Tile(instanceTile.x + baseOffset.x, instanceTile.y + baseOffset.y, instanceTile.level)
 
+            // Get portal tile for this location (to avoid spawning underneath)
+            val portalTile = if (index < 4) gameData.portalNPCs[index]?.tile else null
+
             // Get pest ID from appropriate list
             val pestId = if (index == 4) {
                 // Knight location - spawn shifters
@@ -1099,13 +1239,15 @@ class PestControl : Script {
             // Try to find a free tile within 5 tiles of the base
             var pestTile = baseTile
             var spawned = false
-            for (tryCount in 0 until 10) {
+            for (tryCount in 0 until 20) {
                 pestTile = Tile(
                     baseTile.x + (-5..5).random(), baseTile.y + (-5..5).random(), baseTile.level
                 )
-                // TODO: Check if tile is free (need collision check)
-                spawned = true
-                break
+                // Check if tile is valid (within bounds, walkable, not occupied)
+                if (isValidSpawnTile(pestTile, instanceTile, portalTile, gameData)) {
+                    spawned = true
+                    break
+                }
             }
 
             if (spawned) {
@@ -1116,8 +1258,6 @@ class PestControl : Script {
                     // Spinners need to know which portal they're assigned to for healing
                     if (pest.id.contains("spinner")) {
                         pest["portal_index"] = index
-                        // Start the healing timer for spinners
-                        npcTimerStart("spinner_heal") { 3 } // Check every 3 ticks
                     }
                     gameData.pests.add(pest)
                     log.info { "Spawned pest $pestId at $pestTile for location $index (count: ${gameData.pestCounts[index]})" }

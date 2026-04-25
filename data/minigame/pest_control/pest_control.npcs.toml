@@ -490,7 +490,6 @@ str = 57
 def = 43
 style = "crush"
 max_hit_melee = 70
-hunt_mode = "aggressive"
 examine = "Mind your toes!"
 combat_def = "brawler"
 
@@ -502,7 +501,6 @@ str = 82
 def = 67
 style = "crush"
 max_hit_melee = 90
-hunt_mode = "aggressive"
 examine = "Mind your toes!"
 combat_def = "brawler"
 
@@ -514,7 +512,6 @@ str = 107
 def = 93
 style = "crush"
 max_hit_melee = 120
-hunt_mode = "aggressive"
 examine = "Mind your toes!"
 combat_def = "brawler"
 
@@ -526,7 +523,6 @@ str = 132
 def = 118
 style = "crush"
 max_hit_melee = 140
-hunt_mode = "aggressive"
 examine = "Mind your toes!"
 combat_def = "brawler"
 
@@ -534,7 +530,6 @@ combat_def = "brawler"
 id = 3776
 style = "crush"
 max_hit_melee = 150
-hunt_mode = "aggressive"
 examine = "Mind your toes!"
 combat_def = "brawler"
 
@@ -547,7 +542,6 @@ def = 17
 range = 46
 style = "range"
 max_hit_melee = 60
-hunt_mode = "aggressive"
 examine = "Duck!"
 combat_def = "defiler"
 
@@ -563,7 +557,6 @@ def = 29
 range = 66
 style = "range"
 max_hit_melee = 80
-hunt_mode = "aggressive"
 examine = "Duck!"
 combat_def = "defiler"
 
@@ -580,7 +573,6 @@ def = 41
 range = 84
 style = "range"
 max_hit_melee = 90
-hunt_mode = "aggressive"
 examine = "Duck!"
 combat_def = "defiler"
 
@@ -593,7 +585,6 @@ def = 41
 range = 85
 style = "range"
 max_hit_melee = 90
-hunt_mode = "aggressive"
 examine = "Duck!"
 combat_def = "defiler"
 
@@ -606,7 +597,6 @@ def = 53
 range = 98
 style = "range"
 max_hit_melee = 110
-hunt_mode = "aggressive"
 examine = "Duck!"
 combat_def = "defiler"
 
@@ -623,7 +613,6 @@ def = 65
 range = 117
 style = "range"
 max_hit_melee = 130
-hunt_mode = "aggressive"
 examine = "Duck!"
 combat_def = "defiler"
 
@@ -681,7 +670,6 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 70
-hunt_mode = "aggressive"
 examine = "Worse than termites!"
 combat_def = "ravager"
 
@@ -695,7 +683,6 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 90
-hunt_mode = "aggressive"
 examine = "Worse than termites!"
 combat_def = "ravager"
 
@@ -709,7 +696,6 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 120
-hunt_mode = "aggressive"
 examine = "Worse than termites!"
 combat_def = "ravager"
 
@@ -723,7 +709,6 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 140
-hunt_mode = "aggressive"
 examine = "Worse than termites!"
 combat_def = "ravager"
 
@@ -737,7 +722,6 @@ mage = 0
 range = 0
 style = "crush"
 max_hit_melee = 170
-hunt_mode = "aggressive"
 examine = "Worse than termites!"
 combat_def = "ravager"
 
@@ -751,7 +735,6 @@ mage = 27
 range = 0
 style = "stab"
 max_hit_melee = 50
-hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
 combat_def = "shifter"
@@ -770,7 +753,6 @@ mage = 37
 range = 0
 style = "stab"
 max_hit_melee = 60
-hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
 combat_def = "shifter"
@@ -789,7 +771,6 @@ mage = 47
 range = 0
 style = "stab"
 max_hit_melee = 80
-hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
 combat_def = "shifter"
@@ -808,7 +789,6 @@ mage = 50
 range = 0
 style = "stab"
 max_hit_melee = 80
-hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
 combat_def = "shifter"
@@ -827,7 +807,6 @@ mage = 60
 range = 0
 style = "stab"
 max_hit_melee = 90
-hunt_mode = "aggressive"
 immune_poison = true
 examine = "Nippy little thing!"
 combat_def = "shifter"
@@ -846,7 +825,6 @@ mage = 37
 range = 0
 style = "crush"
 max_hit_melee = 30
-hunt_mode = "aggressive"
 examine = "Eeewww!"
 combat_def = "spinner"
 
@@ -860,7 +838,6 @@ mage = 52
 range = 0
 style = "crush"
 max_hit_melee = 30
-hunt_mode = "aggressive"
 examine = "Eeewww!"
 combat_def = "spinner"
 
@@ -874,7 +851,6 @@ mage = 67
 range = 0
 style = "crush"
 max_hit_melee = 40
-hunt_mode = "aggressive"
 examine = "Eeewww!"
 combat_def = "spinner"
 
@@ -887,8 +863,7 @@ def = 143
 mage = 37
 range = 0
 style = "crush"
-max_hit_melee = 50
-hunt_mode = "aggressive"
+max_hit_melee = 40
 examine = "Eeewww!"
 combat_def = "spinner"
 
@@ -902,7 +877,6 @@ mage = 82
 range = 0
 style = "crush"
 max_hit_melee = 40
-hunt_mode = "aggressive"
 examine = "Eeewww!"
 combat_def = "spinner"
 
@@ -916,7 +890,6 @@ mage = 17
 range = 0
 style = "crush"
 max_hit_melee = 30
-hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
 combat_def = "splatter"
 
@@ -930,7 +903,6 @@ mage = 22
 range = 0
 style = "crush"
 max_hit_melee = 30
-hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
 combat_def = "splatter"
 
@@ -944,7 +916,6 @@ mage = 27
 range = 0
 style = "crush"
 max_hit_melee = 40
-hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
 combat_def = "splatter"
 
@@ -958,7 +929,6 @@ mage = 32
 range = 0
 style = "crush"
 max_hit_melee = 40
-hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
 combat_def = "splatter"
 
@@ -972,7 +942,6 @@ mage = 37
 range = 0
 style = "crush"
 max_hit_melee = 50
-hunt_mode = "aggressive"
 examine = "Don't burst its bubble!"
 combat_def = "splatter"
 
@@ -986,7 +955,6 @@ mage = 46
 range = 0
 style = "ranged_magic"
 max_hit_melee = 60
-hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
 combat_def = "torcher"
 
@@ -1004,7 +972,6 @@ mage = 66
 range = 0
 style = "ranged_magic"
 max_hit_melee = 80
-hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
 combat_def = "torcher"
 
@@ -1026,7 +993,6 @@ mage = 85
 range = 0
 style = "ranged_magic"
 max_hit_melee = 90
-hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
 combat_def = "torcher"
 
@@ -1044,7 +1010,6 @@ mage = 97
 range = 0
 style = "ranged_magic"
 max_hit_melee = 110
-hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
 combat_def = "torcher"
 
@@ -1062,7 +1027,6 @@ mage = 107
 range = 0
 style = "ranged_magic"
 max_hit_melee = 120
-hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
 combat_def = "torcher"
 
@@ -1076,7 +1040,6 @@ mage = 107
 range = 0
 style = "ranged_magic"
 max_hit_melee = 120
-hunt_mode = "aggressive"
 examine = "Burn baby, burn!"
 combat_def = "torcher"
 

@@ -14,3 +14,33 @@ delay = 41
 height = 3
 curve = 15
 time_offset = 5
+
+[shifter_teleport_graphics]
+id = 654
+
+[spinner_heal_graphics]
+id = 658
+
+[splatter_explosion_graphics]
+id = 649
+
+[splatter_explosion_graphics_22]
+id = 649
+
+[splatter_explosion_graphics_33]
+id = 650
+
+[splatter_explosion_graphics_44]
+id = 651
+
+[splatter_explosion_graphics_54]
+id = 652
+
+[splatter_explosion_graphics_65]
+id = 653
+
+[defiler_projectile]
+id = 657
+
+[torcher_projectile]
+id = 647

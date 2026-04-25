@@ -16,9 +16,6 @@ id = 3921
 [defiler_death]
 id = 3922
 
-[defiler_projectile]
-id = 657
-
 [ravager_attack]
 id = 3915
 
@@ -46,6 +43,9 @@ id = 3909
 [spinner_death]
 id = 3910
 
+[spinner_heal]
+id = 3911
+
 [splatter_attack]
 id = 3891
 
@@ -64,29 +64,11 @@ id = 3880
 [torcher_death]
 id = 3881
 
-[torcher_projectile]
-id = 647
-
-[shifter_teleport]
-id = 3904
-
-[shifter_teleport_graphics]
-id = 654
-
-[spinner_heal]
-id = 3911
-
-[spinner_heal_graphics]
-id = 658
-
 [splatter_explode_start]
 id = 3888
 
 [splatter_explode_end]
 id = 3889
-
-[splatter_explosion_graphics]
-id = 649
 
 [void_knight_defend]
 id = 3838

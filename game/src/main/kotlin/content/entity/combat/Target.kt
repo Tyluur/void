@@ -27,6 +27,7 @@ import world.gregs.voidps.engine.entity.character.npc.NPCs
 import world.gregs.voidps.engine.entity.character.player.Player
 import world.gregs.voidps.engine.entity.character.player.combatLevel
 import world.gregs.voidps.engine.entity.character.player.equip.equipped
+import world.gregs.voidps.engine.entity.character.player.name
 import world.gregs.voidps.engine.entity.character.player.skill.Skill
 import world.gregs.voidps.engine.entity.item.Item
 import world.gregs.voidps.network.login.protocol.visual.update.player.EquipSlot
@@ -111,6 +112,11 @@ object Target {
         }
         if (source is NPC && source.id == "death_spawn") {
             return true
+        }
+        // Spinners in Pest Control should never attack players - they prioritize healing portals
+        if (source is NPC && source.id.contains("spinner") && target is Player) {
+            logger.debug { "TARGET: Spinner ${source.id} prevented from attacking player ${target.name}" }
+            return false
         }
         // If the target I'm trying to attack is already in combat and I am not the attacker
         if (target.inSingleCombat && target.underAttack && target.attacker != source) {
