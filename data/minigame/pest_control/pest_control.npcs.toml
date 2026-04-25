@@ -1082,6 +1082,12 @@ combat_def = "torcher"
 
 [void_knight]
 id = 3782
+hitpoints = 2500
+att = 50
+str = 50
 def = 50
 mage = 50
+combat_def = "void_knight"
+options = ["Attack", "Examine"]
+respawn_delay = -1
 examine = "A powerful knight of balance."

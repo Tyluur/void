@@ -1,32 +1,33 @@
 package content.minigame.pest_control
 
 import com.github.michaelbull.logging.InlineLogger
-import content.entity.effect.transform
+import content.entity.combat.Combat.Companion.combat
+import content.entity.combat.dead
+import content.entity.combat.underAttack
 import content.quest.clearInstance
 import content.quest.instanceOffset
 import content.quest.setInstanceLogout
 import content.quest.smallInstance
+import world.gregs.config.Config
 import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.client.message
 import world.gregs.voidps.engine.entity.World
+import world.gregs.voidps.engine.entity.character.mode.combat.CombatMovement
 import world.gregs.voidps.engine.entity.character.move.tele
 import world.gregs.voidps.engine.entity.character.npc.NPCs
 import world.gregs.voidps.engine.entity.character.player.Player
 import world.gregs.voidps.engine.entity.character.player.chat.ChatType
 import world.gregs.voidps.engine.entity.character.player.combatLevel
-import world.gregs.voidps.engine.entity.character.player.skill.Skills
-import world.gregs.voidps.engine.queue.queue
+import world.gregs.voidps.engine.entity.character.player.name
+import world.gregs.voidps.engine.entity.character.player.skill.Skill
+import world.gregs.voidps.engine.timedLoad
 import world.gregs.voidps.engine.timer.Timer
 import world.gregs.voidps.engine.timer.toTicks
-import world.gregs.voidps.engine.timedLoad
-import java.util.Collections
-import java.util.LinkedList
-import java.util.concurrent.TimeUnit
-import world.gregs.voidps.type.Delta
 import world.gregs.voidps.type.Direction
 import world.gregs.voidps.type.Region
 import world.gregs.voidps.type.Tile
-import world.gregs.config.Config
+import world.gregs.voidps.type.random
+import java.util.concurrent.TimeUnit
 
 /**
  * Pest Control configuration data loaded from Groml config file.
@@ -55,8 +56,7 @@ data class DifficultyConfig(
 )
 
 data class PestDataConfig(
-    val pests: List<String>,
-    val shifters: List<String>
+    val pests: List<String>, val shifters: List<String>
 )
 
 data class LocationConfig(
@@ -69,9 +69,7 @@ data class LocationConfig(
 )
 
 data class TileOffset(
-    val x: Int,
-    val y: Int,
-    val level: Int
+    val x: Int, val y: Int, val level: Int
 )
 
 data class TimerConfig(
@@ -83,21 +81,18 @@ data class TimerConfig(
 )
 
 data class LimitConfig(
-    val minPlayersToStart: Int,
-    val knightHealth: Int,
-    val maxPestsPerPortal: Int,
-    val maxPestsNearKnight: Int
+    val minPlayersToStart: Int, val knightHealth: Int, val maxPestsPerPortal: Int, val maxPestsNearKnight: Int
 )
 
 /**
  * Pest Control minigame implementation following void's patterns.
- * 
+ *
  * This script manages the Pest Control minigame including:
  * - Lander entry with combat level and follower restrictions
  * - Centralized lobby management with countdown timer
  * - Game instance creation with proper void instance system
  * - Player logout and death handlers
- * 
+ *
  * Based on TzhaarFightCave pattern for consistency with void's codebase.
  */
 class PestControl : Script {
@@ -107,7 +102,7 @@ class PestControl : Script {
 
     // Debug flag - set to true to skip 30-second lobby timer and start game immediately
     private val DEBUG_MODE = true
-    
+
     // Configuration loaded from Groml file
     private lateinit var config: PestControlConfig
 
@@ -115,12 +110,12 @@ class PestControl : Script {
      * Gets difficulty config by name.
      */
     private fun difficultyConfig(name: String): DifficultyConfig? = config.difficulties[name.lowercase()]
-    
+
     /**
      * Gets pest data config by name.
      */
     private fun pestDataConfig(name: String): PestDataConfig? = config.pestData[name.lowercase()]
-    
+
     private val activeGames = mutableMapOf<Player, PestGameData>()
     private val gameTimers = mutableMapOf<Player, Int>()
     private val pestSpawnTimers = mutableMapOf<Player, Int>()
@@ -129,6 +124,43 @@ class PestControl : Script {
     private val lobbyTimers = mutableMapOf<String, Int>()
 
     init {
+        // Handle void knight damage - allow damage from pests
+        npcCombatDamage("void_knight") { damage ->
+            log.debug { "VOID KNIGHT damage handler called: source=${damage.source}, type=${damage.type}, damage=${damage.damage}" }
+            // Apply damage directly to the void knight
+            this.levels.set(Skill.Constitution, this.levels.get(Skill.Constitution) - damage.damage)
+            log.debug { "VOID KNIGHT HP after damage: ${this.levels.get(Skill.Constitution)}" }
+        }
+
+        // Track player damage to NPCs for Pest Control interface
+        npcCombatDamage { damage ->
+            val source = damage.source
+            val target = this
+            // Only track if source is a player
+            if (source !is Player) {
+                return@npcCombatDamage
+            }
+            // Find if this NPC is part of an active Pest Control game
+            val gameData = activeGames.values.find { game ->
+                game.portalNPCs.contains(target) || game.players.any { player ->
+                    player.tile.region == target.tile.region
+                }
+            }
+            if (gameData == null) {
+                return@npcCombatDamage
+            }
+            // Only track damage to pests and portals, not void knight ( pests damage void knight, not players)
+            if (target.id == "void_knight") {
+                return@npcCombatDamage
+            }
+            // Update player damage tracking
+            val currentDamage = gameData.playerDamage[source] ?: 0
+            gameData.playerDamage[source] = currentDamage + damage.damage
+            log.debug { "Player ${source.name} dealt ${damage.damage} damage to ${target.id}, total: ${gameData.playerDamage[source]}" }
+            // Update interface for this player
+            updateGameInterface(source, gameData)
+        }
+
         // Handle portal damage to update interface
         npcCombatDamage("portal_*") { damage ->
             log.info { "Portal damaged: ${this.id}, damage: $damage" }
@@ -141,13 +173,13 @@ class PestControl : Script {
                 log.warn { "No game data found for portal index $portalIndex" }
                 return@npcCombatDamage
             }
-            
+
             // Portals can only be damaged when shield is down
             if (gameData.portalShielded[portalIndex]) {
                 log.info { "Portal $portalIndex shield is active, ignoring damage" }
                 return@npcCombatDamage // Shield is active, ignore damage
             }
-            
+
             // Update portal health
             val currentHP = gameData.portalHealth[portalIndex]
             val damageInt = when (damage) {
@@ -155,27 +187,33 @@ class PestControl : Script {
             }
             gameData.portalHealth[portalIndex] = maxOf(0, currentHP - damageInt)
             log.info { "Portal $portalIndex health: $currentHP -> ${gameData.portalHealth[portalIndex]} (damage: $damageInt)" }
-            
+
             // Update this NPC's hitpoints
             this["hitpoints"] = gameData.portalHealth[portalIndex]
-            
+
             // Update interface for all players
             for (player in gameData.players) {
                 updateGameInterface(player, gameData)
             }
-            
+
             // Check if portal destroyed
             if (gameData.portalHealth[portalIndex] <= 0) {
                 NPCs.remove(this)
                 gameData.portalNPCs[portalIndex] = null
+                gameData.portalsDestroyed++
                 gameData.shieldsDropped++ // Count as destroyed for win condition
-                
+
                 // Restore 50 HP to Void Knight when portal destroyed
                 gameData.knightHealth = minOf(gameData.knightHealth + 50, gameData.difficultyConfig.knightHealth)
-                
+
                 // Update interface to show knight health restoration
                 for (player in gameData.players) {
                     updateGameInterface(player, gameData)
+                }
+
+                // Check if all portals are destroyed - win condition
+                if (gameData.portalsDestroyed >= 4) {
+                    endGame(gameData, won = true)
                 }
             }
         }
@@ -198,7 +236,7 @@ class PestControl : Script {
 
     /**
      * Game state data for a Pest Control game instance.
-     * 
+     *
      * @property difficultyName The difficulty level name
      * @property difficultyConfig The difficulty configuration
      * @property pestDataConfig The pest data configuration
@@ -229,8 +267,12 @@ class PestControl : Script {
         val pestCounts: MutableList<Int> = mutableListOf(0, 0, 0, 0, 0), // 4 portals + knight
         val portalShielded: MutableList<Boolean> = mutableListOf(true, true, true, true), // All portals start shielded
         var shieldsDropped: Int = 0,
-        val portalNPCs: MutableList<world.gregs.voidps.engine.entity.character.npc.NPC?> = mutableListOf(null, null, null, null),
-        var instanceTile: Tile? = null
+        val portalNPCs: MutableList<world.gregs.voidps.engine.entity.character.npc.NPC?> = mutableListOf(
+            null, null, null, null
+        ),
+        var instanceTile: Tile? = null,
+        var knightNPC: world.gregs.voidps.engine.entity.character.npc.NPC? = null,
+        val pests: MutableList<world.gregs.voidps.engine.entity.character.npc.NPC> = mutableListOf()
     )
 
     init {
@@ -240,10 +282,10 @@ class PestControl : Script {
         var locations: LocationConfig? = null
         var timers: TimerConfig? = null
         var limits: LimitConfig? = null
-        
+
         timedLoad("pest control config") {
             Config.fileReader("./data/minigame/pest_control/pest_control.config.toml") {
-                
+
                 while (nextSection()) {
                     when (val section = section()) {
                         "difficulty.novice", "difficulty.intermediate", "difficulty.veteran" -> {
@@ -260,7 +302,7 @@ class PestControl : Script {
                             var shieldedIds = emptyList<String>()
                             var unshieldedIds = emptyList<String>()
                             var knightHp = 250
-                            
+
                             while (nextPair()) {
                                 when (key()) {
                                     "combat_requirement" -> combatReq = int()
@@ -277,18 +319,26 @@ class PestControl : Script {
                                 }
                             }
                             difficulties[diffName] = DifficultyConfig(
-                                combatReq, entryX, entryY, entryLevel,
-                                exitX, exitY, exitLevel,
-                                portalHealth, rewardPoints,
-                                shieldedIds, unshieldedIds,
+                                combatReq,
+                                entryX,
+                                entryY,
+                                entryLevel,
+                                exitX,
+                                exitY,
+                                exitLevel,
+                                portalHealth,
+                                rewardPoints,
+                                shieldedIds,
+                                unshieldedIds,
                                 knightHp
                             )
                         }
+
                         "pest_data.novice", "pest_data.intermediate", "pest_data.veteran" -> {
                             val pestName = section.substringAfter(".")
                             var pests = emptyList<String>()
                             var shifters = emptyList<String>()
-                            
+
                             while (nextPair()) {
                                 when (key()) {
                                     "pests" -> pests = list().map { it as String }
@@ -297,6 +347,7 @@ class PestControl : Script {
                             }
                             pestData[pestName] = PestDataConfig(pests, shifters)
                         }
+
                         "locations" -> {
                             var entranceX = 0
                             var entranceY = 0
@@ -304,7 +355,7 @@ class PestControl : Script {
                             var regionId = 0
                             var knightOffset: TileOffset? = null
                             val portals = mutableMapOf<String, TileOffset>()
-                            
+
                             while (nextPair()) {
                                 when (key()) {
                                     "entrance_x" -> entranceX = int()
@@ -313,7 +364,7 @@ class PestControl : Script {
                                     "region_id" -> regionId = int()
                                 }
                             }
-                            
+
                             // Read knight offset section
                             if (nextSection() && section() == "locations.knight_offset") {
                                 var kx = 0
@@ -328,7 +379,7 @@ class PestControl : Script {
                                 }
                                 knightOffset = TileOffset(kx, ky, klevel)
                             }
-                            
+
                             // Read portal sections
                             for (portalName in listOf("purple", "blue", "yellow", "red")) {
                                 if (nextSection() && section() == "locations.portals.$portalName") {
@@ -345,19 +396,19 @@ class PestControl : Script {
                                     portals[portalName] = TileOffset(px, py, plevel)
                                 }
                             }
-                            
+
                             locations = LocationConfig(
-                                entranceX, entranceY, entranceLevel, regionId,
-                                knightOffset!!, portals
+                                entranceX, entranceY, entranceLevel, regionId, knightOffset!!, portals
                             )
                         }
+
                         "timers" -> {
                             var lobby = 30
                             var game = 1200
                             var pestSpawn = 10
                             var firstShieldDrop = 15
                             var subsequentShieldDrop = 30
-                            
+
                             while (nextPair()) {
                                 when (key()) {
                                     "lobby_timer_seconds" -> lobby = int()
@@ -369,12 +420,13 @@ class PestControl : Script {
                             }
                             timers = TimerConfig(lobby, game, pestSpawn, firstShieldDrop, subsequentShieldDrop)
                         }
+
                         "limits" -> {
                             var minPlayers = 1
                             var knightHp = 250
                             var maxPestsPortal = 15
                             var maxPestsKnight = 4
-                            
+
                             while (nextPair()) {
                                 when (key()) {
                                     "min_players_to_start" -> minPlayers = int()
@@ -387,13 +439,13 @@ class PestControl : Script {
                         }
                     }
                 }
-                
+
             }
             difficulties.size
         }
-        
+
         config = PestControlConfig(difficulties, pestData, locations!!, timers!!, limits!!)
-        
+
         // Log loaded config information
         log.info { "Pest Control Loaded configuration:" }
         log.info { "  Difficulties: ${config.difficulties.keys.joinToString(", ")}" }
@@ -407,16 +459,30 @@ class PestControl : Script {
         log.info { "  Region: ${config.locations.regionId}, Entrance: (${config.locations.entranceX}, ${config.locations.entranceY})" }
         log.info { "  Timers: lobby=${config.timers.lobby_timer_seconds}s, game=${config.timers.game_timer_seconds}s, spawn=${config.timers.pest_spawn_interval_seconds}s" }
         log.info { "  Limits: minPlayers=${config.limits.minPlayersToStart}, knightHealth=${config.limits.knightHealth}, maxPestsPerPortal=${config.limits.maxPestsPerPortal}" }
-        
+
         // Initialize instance configuration from config
         pestRegion = Region(config.locations.regionId)
         entrance = Tile(config.locations.entranceX, config.locations.entranceY, config.locations.entranceLevel)
-        knightOffset = Tile(config.locations.knightOffset.x, config.locations.knightOffset.y, config.locations.knightOffset.level)
+        knightOffset =
+            Tile(config.locations.knightOffset.x, config.locations.knightOffset.y, config.locations.knightOffset.level)
         portalOffsets = listOf(
-            Tile(config.locations.portals["purple"]!!.x, config.locations.portals["purple"]!!.y, config.locations.portals["purple"]!!.level),
-            Tile(config.locations.portals["blue"]!!.x, config.locations.portals["blue"]!!.y, config.locations.portals["blue"]!!.level),
-            Tile(config.locations.portals["yellow"]!!.x, config.locations.portals["yellow"]!!.y, config.locations.portals["yellow"]!!.level),
-            Tile(config.locations.portals["red"]!!.x, config.locations.portals["red"]!!.y, config.locations.portals["red"]!!.level)
+            Tile(
+                config.locations.portals["purple"]!!.x,
+                config.locations.portals["purple"]!!.y,
+                config.locations.portals["purple"]!!.level
+            ), Tile(
+                config.locations.portals["blue"]!!.x,
+                config.locations.portals["blue"]!!.y,
+                config.locations.portals["blue"]!!.level
+            ), Tile(
+                config.locations.portals["yellow"]!!.x,
+                config.locations.portals["yellow"]!!.y,
+                config.locations.portals["yellow"]!!.level
+            ), Tile(
+                config.locations.portals["red"]!!.x,
+                config.locations.portals["red"]!!.y,
+                config.locations.portals["red"]!!.level
+            )
         )
         lobbyTimerSeconds = config.timers.lobby_timer_seconds
         gameTimerSeconds = config.timers.game_timer_seconds
@@ -427,7 +493,7 @@ class PestControl : Script {
         knightHealth = config.limits.knightHealth
         maxPestsPerPortal = config.limits.maxPestsPerPortal
         maxPestsNearKnight = config.limits.maxPestsNearKnight
-        
+
         // Initialize lobbies for each difficulty
         for (difficultyName in config.difficulties.keys) {
             lobbies[difficultyName] = mutableListOf()
@@ -485,6 +551,21 @@ class PestControl : Script {
         }
 
         // Player event handlers
+        // Handle pest death - clean up pest counts and remove from tracking
+        npcDeath("*") {
+            val spawnIndex = this["pest_control_spawn_index", -1]
+            if (spawnIndex != -1) {
+                for (gameData in activeGames.values) {
+                    if (gameData.pests.contains(this)) {
+                        gameData.pestCounts[spawnIndex] = maxOf(0, gameData.pestCounts[spawnIndex] - 1)
+                        gameData.pests.remove(this)
+                        log.info { "Pest ${this.id} died at location $spawnIndex (count: ${gameData.pestCounts[spawnIndex]})" }
+                        break
+                    }
+                }
+            }
+        }
+
         playerLogout(::handleLogout)
         playerDeath {
             val difficultyName = get("pest_control_difficulty", "")
@@ -524,27 +605,29 @@ class PestControl : Script {
 
     /**
      * Handles player entering the Pest Control lander.
-     * 
+     *
      * Checks combat level requirement and follower restriction before adding player to lobby.
-     * 
+     *
      * @param player The player attempting to enter
      * @param difficultyName The difficulty level name being entered
      */
     private fun Player.enterLander(difficultyName: String) {
         val diffConfig = difficultyConfig(difficultyName) ?: run {
-            message("Invalid difficulty: $difficultyName", ChatType.Console)
+            message("Invalid difficulty: $difficultyName", ChatType.Game)
             return
         }
-        
+
         if (combatLevel < diffConfig.combatRequirement) {
-            message("You need a combat level of ${diffConfig.combatRequirement} or more to enter this boat.", ChatType.Console)
+            message(
+                "You need a combat level of ${diffConfig.combatRequirement} or more to enter this boat.", ChatType.Game
+            )
             return
         }
 
         // Check for follower/familiar
         val followerIndex = get("follower_index", -1)
         if (followerIndex != -1 && NPCs.indexed(followerIndex) != null) {
-            message("You can't take a follower into the lander, there isn't enough room!", ChatType.Console)
+            message("You can't take a follower into the lander, there isn't enough room!", ChatType.Game)
             return
         }
 
@@ -560,7 +643,7 @@ class PestControl : Script {
         // Teleport to lander
         val entryTile = Tile(diffConfig.entryTileX, diffConfig.entryTileY, diffConfig.entryTileLevel)
         tele(entryTile)
-        message("You board the lander.", ChatType.Console)
+        message("You board the lander.", ChatType.Game)
 
         // Open lobby interface
         this.interfaces.open("pest_control_waiting")
@@ -573,7 +656,7 @@ class PestControl : Script {
 
     /**
      * Updates the lander waiting interface for a player.
-     * 
+     *
      * @param player The player to update
      * @param difficultyName The difficulty name of the lander
      */
@@ -582,25 +665,32 @@ class PestControl : Script {
         val timer = lobbyTimers[difficultyName] ?: lobbyTimerSeconds
         synchronized(lobby) {
             val minutesLeft = timer / 60
-            player.interfaces.sendText("pest_control_waiting", "title", difficultyName.lowercase().replaceFirstChar { it.uppercase() })
-            player.interfaces.sendText("pest_control_waiting", "departure", "Next Departure: $minutesLeft minutes ${if (minutesLeft % 2 != 0) "30 seconds" else ""}")
+            player.interfaces.sendText(
+                "pest_control_waiting", "title", difficultyName.lowercase().replaceFirstChar { it.uppercase() })
+            player.interfaces.sendText(
+                "pest_control_waiting",
+                "departure",
+                "Next Departure: $minutesLeft minutes ${if (minutesLeft % 2 != 0) "30 seconds" else ""}"
+            )
             player.interfaces.sendText("pest_control_waiting", "players_ready", "Player's Ready: ${lobby.size}")
-            player.interfaces.sendText("pest_control_waiting", "commendations", "Commendations: ${player["pest_control_points", 0]}")
+            player.interfaces.sendText(
+                "pest_control_waiting", "commendations", "Commendations: ${player["pest_control_points", 0]}"
+            )
         }
     }
 
     /**
      * Handles player exiting the lander via gangplank.
-     * 
+     *
      * Removes player from lobby and teleports them back.
-     * 
+     *
      * @param player The player exiting
      */
     private fun handleExitLander(player: Player) {
         val difficultyName = player.get("pest_control_difficulty", "")
         val diffConfig = difficultyConfig(difficultyName) ?: return
 
-        if (player.get("pest_control_in_lobby", false)) {
+        if (player["pest_control_in_lobby", false]) {
             val lobby = lobbies[difficultyName]
             if (lobby != null) {
                 synchronized(lobby) {
@@ -615,11 +705,12 @@ class PestControl : Script {
         player.interfaces.close("pest_control_waiting")
         val exitTile = Tile(diffConfig.exitTileX, diffConfig.exitTileY, diffConfig.exitTileLevel)
         player.tele(exitTile)
-        player.message("You leave the lander.", ChatType.Console)
+        player.message("You leave the lander.", ChatType.Game)
     }
+
     /**
      * Updates lobby timers and starts games when conditions are met.
-     * 
+     *
      * Called every second by the timer system.
      * Starts game when timer reaches 0 and there are enough players.
      */
@@ -654,10 +745,10 @@ class PestControl : Script {
 
     /**
      * Starts a Pest Control game instance for the given difficulty.
-     * 
+     *
      * Creates a dynamic instance following void's pattern:
      * player.smallInstance → delay(1) → player.instanceOffset → player.tele
-     * 
+     *
      * @param difficultyName The difficulty name to start
      */
     private fun startGame(difficultyName: String) {
@@ -679,12 +770,14 @@ class PestControl : Script {
             pestDataConfig = pestConfig,
             players = players.toMutableList(),
             knightHealth = knightHealth,
-            portalHealth = mutableListOf(diffConfig.portalHealth, diffConfig.portalHealth, diffConfig.portalHealth, diffConfig.portalHealth),
+            portalHealth = mutableListOf(
+                diffConfig.portalHealth, diffConfig.portalHealth, diffConfig.portalHealth, diffConfig.portalHealth
+            ),
             timeRemaining = gameTimerSeconds,
             portalBaseHealth = diffConfig.portalHealth,
             playerDamage = mutableMapOf()
         )
-        
+
         // Initialize player damage tracking
         for (player in players) {
             gameData.playerDamage[player] = 0
@@ -722,7 +815,7 @@ class PestControl : Script {
             pestSpawnTimers[player] = pestSpawnIntervalSeconds
             shieldDropTimers[player] = firstShieldDropSeconds
 
-            player.message("Pest Control game starting!", ChatType.Console)
+            player.message("Pest Control game starting!", ChatType.Game)
         }
 
         // Spawn NPCs in the instance after instances are created
@@ -733,31 +826,30 @@ class PestControl : Script {
 
     /**
      * Spawns portals and Void Knight for the game.
-     * 
+     *
      * @param gameData The game state data
      * @param instanceTile The world tile where the instance region starts
      */
     private fun spawnGameNPCs(gameData: PestGameData, instanceTile: Tile) {
         log.info { "Spawning NPCs with instance tile: $instanceTile" }
-        
+
         // Spawn Void Knight at instance base + relative offset
         // Direct coordinate addition to avoid Delta wrapping issues with negative values
         val knightTile = Tile(instanceTile.x + knightOffset.x, instanceTile.y + knightOffset.y, instanceTile.level)
         log.info { "Spawning Void Knight at: $knightTile" }
         val knight = NPCs.add("void_knight", knightTile, Direction.SOUTH)
         knight["hitpoints"] = gameData.knightHealth
+        gameData.knightNPC = knight
         log.info { "Void Knight spawned: ${knight.index != -1}" }
 
         // Spawn portals (purple, blue, yellow, red) - all start shielded
         for (i in portalOffsets.indices) {
-            val portalTile = Tile(instanceTile.x + portalOffsets[i].x, instanceTile.y + portalOffsets[i].y, instanceTile.level)
+            val portalTile =
+                Tile(instanceTile.x + portalOffsets[i].x, instanceTile.y + portalOffsets[i].y, instanceTile.level)
             val portalId = gameData.difficultyConfig.portalShieldedIds[i]
             log.info { "Spawning $portalId at: $portalTile" }
             val portal = NPCs.add(portalId, portalTile, Direction.SOUTH)
             portal["hitpoints"] = gameData.portalBaseHealth
-            portal["damage_cap"] = 400
-            portal["cant_follow_under_combat"] = true
-            portal["force_multi_area"] = true
             portal["portal_index"] = i
             gameData.portalHealth[i] = gameData.portalBaseHealth
             gameData.portalNPCs[i] = portal
@@ -793,11 +885,55 @@ class PestControl : Script {
                 pestSpawnTimers[player] = pestSpawnIntervalSeconds
             }
 
-            // Drop shield when timer reaches 0
+            // Make pests attack the Void Knight
+            val knight = gameData.knightNPC
+            log.debug {
+                "PEST TARGETING: knight=$knight, knight.index=${knight?.index}, knight.dead=${knight?.dead}, knight.hp=${
+                    knight?.levels?.get(
+                        Skill.Constitution
+                    )
+                }"
+            }
+            if (knight != null && knight.index != -1) {
+                gameData.pests.removeAll { it.index == -1 || it.dead }
+                log.debug { "PEST TARGETING: Active pests: ${gameData.pests.size}" }
+                for (pest in gameData.pests) {
+                    if (pest.index == -1 || pest.dead) continue
+                    if (pest.underAttack) continue
+                    val alreadyTargetingKnight =
+                        pest.mode is CombatMovement && (pest.mode as CombatMovement).target == knight
+                    if (alreadyTargetingKnight) continue
+                    val pestId = pest.id
+                    log.debug { "PEST TARGETING: Checking pest=$pestId, underAttack=${pest.underAttack}, mode=${pest.mode}" }
+                    when {
+                        pestId.startsWith("defiler_") -> {
+                            log.debug { "PEST TARGETING: Directing defiler $pestId to attack knight" }
+                            combat(pest, knight)
+                        }
+
+                        pestId.startsWith("torcher_") -> {
+                            log.debug { "PEST TARGETING: Directing torcher $pestId to attack knight" }
+                            combat(pest, knight)
+                        }
+
+                        pestId.startsWith("shifter_") && random.nextInt(50) < 2 -> {
+                            log.debug { "PEST TARGETING: Directing shifter $pestId to attack knight" }
+                            combat(pest, knight)
+                        }
+                    }
+                }
+            }
+
+            // Spawn pests when timer reaches 0
             if (shieldTimer <= 0 && gameData.shieldsDropped < 4) {
                 dropPortalShield(gameData)
                 // Use subsequent interval after first shield drops
                 shieldDropTimers[player] = subsequentShieldDropIntervalSeconds
+            }
+
+            // Update knight health from actual NPC constitution levels
+            if (knight != null && knight.index != -1) {
+                gameData.knightHealth = knight.levels.get(Skill.Constitution)
             }
 
             // Update interface for all players in this game
@@ -833,16 +969,16 @@ class PestControl : Script {
     /**
      * Drops a portal shield, transforming it from shielded to unshielded.
      * Based on 2009scape's removePortalShield logic.
-     * 
+     *
      * @param gameData The game state data
      */
     private fun dropPortalShield(gameData: PestGameData) {
         val portalIndex = gameData.shieldsDropped
         if (portalIndex >= 4) return
-        
+
         // Get the unshielded portal ID
         val unshieldedId = gameData.difficultyConfig.portalUnshieldedIds[portalIndex]
-        
+
         // Get the portal NPC from stored references
         val portal = gameData.portalNPCs[portalIndex]
         if (portal != null) {
@@ -852,34 +988,31 @@ class PestControl : Script {
             val portalTile = portal.tile
             val newPortal = NPCs.add(unshieldedId, portalTile, Direction.SOUTH)
             newPortal["hitpoints"] = gameData.portalHealth[portalIndex]
-            newPortal["damage_cap"] = 400
-            newPortal["cant_follow_under_combat"] = true
-            newPortal["force_multi_area"] = true
             newPortal["portal_index"] = portalIndex
             gameData.portalNPCs[portalIndex] = newPortal
         }
-        
+
         // Update shield state
         gameData.portalShielded[portalIndex] = false
         gameData.shieldsDropped++
-        
+
         // Send message to all players
         val portalNames = listOf("purple, western", "blue, eastern", "yellow, south-eastern", "red, south-western")
         val message = "The ${portalNames[portalIndex]} portal shield has dropped!"
         for (player in gameData.players) {
-            player.message(message, ChatType.Console)
+            player.message(message, ChatType.Game)
         }
     }
 
     /**
      * Spawns pests near active portals and knight.
      * Follows Matrix4 logic with pest count limits per location.
-     * 
+     *
      * @param gameData The game state data
      */
     private fun spawnPests(gameData: PestGameData) {
         val instanceTile = gameData.instanceTile ?: return
-        
+
         // Try to spawn pests at each portal location (0-3) and knight location (4)
         for (index in 0 until 5) {
             // Determine max pests for this location
@@ -888,14 +1021,14 @@ class PestControl : Script {
                 gameData.portalHealth[index] <= 0 -> continue // Portal destroyed, skip
                 else -> maxPestsPerPortal // Unlocked portal (will change to 5 when shield system is added)
             }
-            
+
             // Check if we've reached the limit for this location
             if (gameData.pestCounts[index] >= maxPests) continue
-            
+
             // Get base tile for this location
             val baseOffset = if (index == 4) knightOffset else portalOffsets[index]
             val baseTile = Tile(instanceTile.x + baseOffset.x, instanceTile.y + baseOffset.y, instanceTile.level)
-            
+
             // Get pest ID from appropriate list
             val pestId = if (index == 4) {
                 // Knight location - spawn shifters
@@ -904,25 +1037,25 @@ class PestControl : Script {
                 // Portal location - spawn regular pests
                 gameData.pestDataConfig.pests.random()
             }
-            
+
             // Try to find a free tile within 5 tiles of the base
             var pestTile = baseTile
             var spawned = false
             for (tryCount in 0 until 10) {
                 pestTile = Tile(
-                    baseTile.x + (-5..5).random(),
-                    baseTile.y + (-5..5).random(),
-                    baseTile.level
+                    baseTile.x + (-5..5).random(), baseTile.y + (-5..5).random(), baseTile.level
                 )
                 // TODO: Check if tile is free (need collision check)
                 spawned = true
                 break
             }
-            
+
             if (spawned) {
                 val pest = NPCs.add(pestId, pestTile, Direction.SOUTH)
                 if (pest.index != -1) {
                     gameData.pestCounts[index]++
+                    pest["pest_control_spawn_index"] = index
+                    gameData.pests.add(pest)
                     log.info { "Spawned pest $pestId at $pestTile for location $index (count: ${gameData.pestCounts[index]})" }
                 }
             }
@@ -931,7 +1064,7 @@ class PestControl : Script {
 
     /**
      * Updates the game interface for a player.
-     * 
+     *
      * @param player The player to update
      * @param gameData The game state data
      */
@@ -939,18 +1072,22 @@ class PestControl : Script {
         val minutesLeft = gameData.timeRemaining / 60
         player.interfaces.sendText("pest_control_playing", "time", "$minutesLeft min")
         player.interfaces.sendText("pest_control_playing", "knight_health", "${gameData.knightHealth}")
-        
+
         // Update player damage/activity display
         val playerDamage = gameData.playerDamage[player] ?: 0
         player.interfaces.sendText("pest_control_playing", "activity", "$playerDamage")
-        
+
         // Update portal health displays (components 13-16)
         for (i in 0 until 4) {
             val portalHP = gameData.portalHealth[i]
             val color = if (portalHP > 0) "<col=00FF00>" else "<col=FF0000>"
-            player.interfaces.sendText("pest_control_playing", "portal_${listOf("purple", "blue", "yellow", "red")[i]}_health", "$color$portalHP")
+            player.interfaces.sendText(
+                "pest_control_playing",
+                "portal_${listOf("purple", "blue", "yellow", "red")[i]}_health",
+                "$color$portalHP"
+            )
         }
-        
+
         // Update portal shield states using varp 719
         // Each shield is represented by 2 bits in the varp
         var shieldVarp = 0
@@ -968,18 +1105,33 @@ class PestControl : Script {
             }
         }
         player.variables.set("pest_control_shields", shieldVarp)
+
+        // Update portal destruction states using varp
+        // Based on 2009scape: sends config with value << 28 to show destroyed portals
+        var destroyedVarp = 0
+        for (i in 0 until 4) {
+            if (gameData.portalNPCs[i] == null) {
+                // Portal destroyed - set the bit
+                destroyedVarp = destroyedVarp or (1 shl i)
+            }
+        }
+        player.variables.set("pest_control_portals_destroyed", destroyedVarp shl 28)
     }
 
     /**
      * Ends a Pest Control game with a win or lose result.
-     * 
+     *
      * @param gameData The game state data
      * @param won Whether the game was won
      */
     private fun endGame(gameData: PestGameData, won: Boolean) {
-        val exitTile = Tile(gameData.difficultyConfig.exitTileX, gameData.difficultyConfig.exitTileY, gameData.difficultyConfig.exitTileLevel)
+        val exitTile = Tile(
+            gameData.difficultyConfig.exitTileX,
+            gameData.difficultyConfig.exitTileY,
+            gameData.difficultyConfig.exitTileLevel
+        )
         val points = gameData.difficultyConfig.rewardPoints
-        
+
         for (player in gameData.players) {
             player.interfaces.close("pest_control_playing")
             player.clearInstance()
@@ -989,9 +1141,12 @@ class PestControl : Script {
             if (won) {
                 val currentPoints = player["pest_control_points", 0]
                 player["pest_control_points"] = currentPoints + points
-                player.message("Congratulations! You successfully defended the Void Knight and earned $points commendation points!", ChatType.Console)
+                player.message(
+                    "Congratulations! You successfully defended the Void Knight and earned $points commendation points!",
+                    ChatType.Game
+                )
             } else {
-                player.message("You failed to protect the Void Knight. No points awarded.", ChatType.Console)
+                player.message("You failed to protect the Void Knight. No points awarded.", ChatType.Game)
             }
 
             // Teleport back to exit tile
@@ -1001,9 +1156,9 @@ class PestControl : Script {
 
     /**
      * Handles player logout while in Pest Control.
-     * 
+     *
      * Removes player from lobby and cleans up instance if in game.
-     * 
+     *
      * @param player The player logging out
      * @return True if logout should proceed, false otherwise
      */

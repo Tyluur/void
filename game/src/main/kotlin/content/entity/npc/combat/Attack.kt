@@ -43,6 +43,9 @@ class Attack(
 
     init {
         npcCombatSwing { primaryTarget ->
+            if (primaryTarget is NPC && primaryTarget.id == "void_knight") {
+                println("ATTACK swingNpc: attacker=$id, target=void_knight")
+            }
             val defId = if (primaryTarget is Player) {
                 val def = def(primaryTarget)
                 def["combat_def", get("transform_id", def.stringId)]
@@ -110,11 +113,20 @@ class Attack(
                         offense = listOf("crush", "range", "magic").random(random)
                         defence = offense
                     }
+                    if (target is NPC && target.id == "void_knight") {
+                        println("ATTACK: About to call hit(), offense=$offense, delay=$delay, hit.max=${hit.max}")
+                    }
                     val damage = if (hit.max == 0) {
                         hit(target = target, delay = delay, offensiveType = offense, defensiveType = defence, special = hit.special, spell = attack.id) // Reuse spell for attack name
                     } else {
                         val damage = Damage.roll(source = this, target = target, offensiveType = offense, weapon = Item.EMPTY, special = hit.special, defensiveType = defence, range = hit.min..hit.max, skipAccuracyRoll = !hit.accuracyRoll)
+                        if (target is NPC && target.id == "void_knight") {
+                            println("ATTACK: Rolled damage=$damage, calling hit()")
+                        }
                         hit(target = target, delay = delay, offensiveType = offense, defensiveType = defence, special = hit.special, damage = damage, spell = attack.id)
+                    }
+                    if (target is NPC && target.id == "void_knight") {
+                        println("ATTACK: hit() returned damage=$damage")
                     }
                     if (damage > 0) {
                         miss = false

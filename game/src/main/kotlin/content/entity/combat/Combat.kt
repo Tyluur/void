@@ -1,5 +1,6 @@
 package content.entity.combat
 
+import com.github.michaelbull.logging.InlineLogger
 import content.area.wilderness.inSingleCombat
 import content.entity.player.combat.special.specialAttack
 import content.skill.magic.Magic
@@ -92,10 +93,21 @@ class Combat(val combatDefinitions: CombatDefinitions) :
 
     fun damage(character: Character, it: CombatDamage) {
         val (source, type) = it
+        if (character is NPC && character.id == "void_knight") {
+            logger.debug { "VOID KNIGHT DAMAGE: source=$source, type=$type, current hp=${character.levels.get(Skill.Constitution)}, mode=${character.mode}, dead=${character.dead}" }
+        }
         if (source == character || type == "poison" || type == "disease" || type == "healed") {
+            if (character is NPC && character.id == "void_knight") {
+                logger.debug { "VOID KNIGHT: Skipping damage - source=$source, type=$type" }
+            }
             return
         }
-        if (character.mode !is CombatMovement && character.mode !is PauseMode) {
+        // Void knight doesn't retaliate - skip retaliation only, not damage processing
+        val skipRetaliation = character is NPC && character.id == "void_knight"
+        if (skipRetaliation) {
+            logger.debug { "VOID KNIGHT: Skipping retaliation" }
+        }
+        if (!skipRetaliation && character.mode !is CombatMovement && character.mode !is PauseMode) {
             retaliate(character, source)
         }
     }
@@ -147,7 +159,12 @@ class Combat(val combatDefinitions: CombatDefinitions) :
     }
 
     companion object {
+        val logger = InlineLogger()
+
         fun combat(character: Character, target: Character) {
+            if (target is NPC && target.id == "void_knight") {
+                logger.debug { "VOID KNIGHT combat() called: attacker=$character, target=$target, attacker.mode=${character.mode}, attacker.target=${character.target}" }
+            }
             if (character.mode !is CombatMovement || character.target != target) {
                 character.mode = CombatMovement(character, target)
                 character.target = target
@@ -157,14 +174,23 @@ class Combat(val combatDefinitions: CombatDefinitions) :
                 return
             }
             if (character.target == null || !Target.attackable(character, target)) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "VOID KNIGHT: Target not attackable or null, setting EmptyMode" }
+                }
                 character.mode = EmptyMode
                 return
             }
             val attackRange = character.attackRange
             if (!movement.arrived(if (attackRange == 1 && character.weapon.def["weapon_type", ""] != "salamander") -1 else attackRange)) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "VOID KNIGHT: Not arrived at target yet" }
+                }
                 return
             }
             if (character.hasClock("action_delay")) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "VOID KNIGHT: Has action delay clock" }
+                }
                 return
             }
             (character.mode as? CombatMovement)?.started = true
@@ -174,6 +200,9 @@ class Combat(val combatDefinitions: CombatDefinitions) :
                 else -> return
             }
             if (!prepared) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "VOID KNIGHT: Combat not prepared" }
+                }
                 character.mode = EmptyMode
                 return
             }
@@ -200,6 +229,9 @@ class Combat(val combatDefinitions: CombatDefinitions) :
             }
             target.start("under_attack", 8)
             if (character is NPC) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "VOID KNIGHT: About to call CombatApi.swing" }
+                }
                 CombatApi.swing(character, target, character.fightStyle)
             } else if (character is Player) {
                 val style = character.fightStyle

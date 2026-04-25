@@ -1,5 +1,6 @@
 package content.entity.combat
 
+import com.github.michaelbull.logging.InlineLogger
 import content.area.wilderness.Wilderness
 import content.area.wilderness.inPvp
 import content.area.wilderness.inSingleCombat
@@ -31,28 +32,56 @@ import world.gregs.voidps.engine.entity.item.Item
 import world.gregs.voidps.network.login.protocol.visual.update.player.EquipSlot
 
 object Target {
+    private val logger = InlineLogger()
+
     fun attackable(source: Character, target: Character): Boolean {
+        if (target is NPC && target.id == "void_knight") {
+            logger.debug { "TARGET.attackable for void_knight: source=$source, target=$target, target.dead=${target.dead}, target.index=${target.index}" }
+        }
         if (target is NPC) {
             if (target.id.startsWith("door_support") && NPCDefinitions.get(target.id).options[1] == "Destroy") {
                 return true
             }
+            // Void Knight in Pest Control is attackable by pests (NPCs) but not players
+            if (target.id == "void_knight" && source is NPC) {
+                logger.debug { "TARGET: void_knight is attackable by NPC" }
+                return true
+            }
             if (source is Player && !CombatApi.canAttack(source, target)) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "TARGET: void_knight - Player cannot attack" }
+                }
                 return false
             }
             if (target.transform != "") {
                 if (!NPCDefinitions.get(target.transform).options.contains("Attack")) {
+                    if (target is NPC && target.id == "void_knight") {
+                        logger.debug { "TARGET: void_knight - No Attack option in transform" }
+                    }
                     return false
                 }
             } else if (target.def.options[1] != "Attack") {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "TARGET: void_knight - No Attack option in def" }
+                }
                 return false
             }
             if (target.mode == PauseMode) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "TARGET: void_knight - In PauseMode" }
+                }
                 return false
             }
             if (target.index == -1) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "TARGET: void_knight - Index is -1" }
+                }
                 return false
             }
             if (NPCs.indexed(target.index) == null) {
+                if (target is NPC && target.id == "void_knight") {
+                    logger.debug { "TARGET: void_knight - Not indexed" }
+                }
                 return false
             }
         }

@@ -87,3 +87,9 @@ id = 3889
 
 [splatter_explosion_graphics]
 id = 649
+
+[void_knight_defend]
+id = 3838
+
+[void_knight_death]
+id = 3839
