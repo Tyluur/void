@@ -17,7 +17,7 @@ defend_anim = "defiler_defend"
 death_anim = "defiler_death"
 
 [defiler.range]
-range = 8
+range = 10
 anim = "defiler_attack"
 projectile = "defiler_spine"
 target_hit = { offense = "range", max = 60 }
@@ -78,7 +78,7 @@ defend_anim = "torcher_defend"
 death_anim = "torcher_death"
 
 [torcher.magic]
-range = 8
+range = 10
 anim = "torcher_attack"
 projectile = "torcher_fire"
 target_hit = { offense = "magic", max = 60 }

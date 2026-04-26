@@ -12,7 +12,8 @@ import content.quest.smallInstance
 import world.gregs.config.Config
 import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.client.message
-import world.gregs.voidps.engine.entity.World
+import world.gregs.voidps.engine.entity.obj.GameObjects
+import world.gregs.voidps.engine.entity.obj.GameObject
 import world.gregs.voidps.engine.entity.character.mode.EmptyMode
 import world.gregs.voidps.engine.entity.character.mode.combat.CombatMovement
 import world.gregs.voidps.engine.entity.character.move.tele
@@ -31,7 +32,11 @@ import world.gregs.voidps.type.Tile
 import world.gregs.voidps.type.random
 import world.gregs.voidps.engine.map.collision.Collisions
 import org.rsmod.game.pathfinder.flag.CollisionFlag
+import world.gregs.voidps.engine.GameLoop
 import world.gregs.voidps.engine.map.collision.check
+import org.rsmod.game.pathfinder.LineValidator
+import world.gregs.voidps.engine.entity.World
+import world.gregs.voidps.engine.entity.obj.ObjectShape
 import java.util.concurrent.TimeUnit
 
 /**
@@ -42,7 +47,9 @@ data class PestControlConfig(
     val pestData: Map<String, PestDataConfig>,
     val locations: LocationConfig,
     val timers: TimerConfig,
-    val limits: LimitConfig
+    val limits: LimitConfig,
+    val barricadeOffsets: List<TileOffset> = emptyList(),
+    val gateOffsets: List<TileOffset> = emptyList()
 )
 
 data class DifficultyConfig(
@@ -111,6 +118,9 @@ class PestControl : Script {
 
     // Configuration loaded from Groml file
     private lateinit var config: PestControlConfig
+    
+    // Line of sight validator for ranged attacks
+    private val lineValidator = LineValidator(flags = Collisions.map)
 
     /**
      * Gets difficulty config by name.
@@ -303,6 +313,7 @@ class PestControl : Script {
     private val knightHealth: Int
     private val maxPestsPerPortal: Int
     private val maxPestsNearKnight: Int
+    private val barricadeOffsets: List<TileOffset>
 
     /**
      * Game state data for a Pest Control game instance.
@@ -343,16 +354,19 @@ class PestControl : Script {
         ),
         var instanceTile: Tile? = null,
         var knightNPC: world.gregs.voidps.engine.entity.character.npc.NPC? = null,
-        val pests: MutableList<world.gregs.voidps.engine.entity.character.npc.NPC> = mutableListOf()
+        val pests: MutableList<world.gregs.voidps.engine.entity.character.npc.NPC> = mutableListOf(),
+        val barricades: MutableMap<Tile, Int> = mutableMapOf() // Tracks barricade objects and their current state (ID)
     )
 
     init {
         // Load configuration from Groml file
         val difficulties = mutableMapOf<String, DifficultyConfig>()
-        val pestData = mutableMapOf<String, PestDataConfig>()
+        var pestData = mutableMapOf<String, PestDataConfig>()
         var locations: LocationConfig? = null
         var timers: TimerConfig? = null
         var limits: LimitConfig? = null
+        var barricadeOffsets = emptyList<TileOffset>()
+        var gateOffsets = emptyList<TileOffset>()
 
         timedLoad("pest control config") {
             Config.fileReader("./data/minigame/pest_control/pest_control.config.toml") {
@@ -508,6 +522,43 @@ class PestControl : Script {
                             }
                             limits = LimitConfig(minPlayers, knightHp, maxPestsPortal, maxPestsKnight)
                         }
+
+                        "barricade_offsets" -> {
+                            var barricadeOffsetsLocal = emptyList<TileOffset>()
+                            var gateOffsetsLocal = emptyList<TileOffset>()
+                            while (nextPair()) {
+                                when (key()) {
+                                    "gates" -> {
+                                        val offsetList = list()
+                                        gateOffsetsLocal = offsetList.mapNotNull { item ->
+                                            if (item is Map<*, *>) {
+                                                val x = (item["x"] as? Number)?.toInt() ?: 0
+                                                val y = (item["y"] as? Number)?.toInt() ?: 0
+                                                val level = 0
+                                                TileOffset(x, y, level)
+                                            } else {
+                                                null
+                                            }
+                                        }
+                                    }
+                                    "barricades" -> {
+                                        val offsetList = list()
+                                        barricadeOffsetsLocal = offsetList.mapNotNull { item ->
+                                            if (item is Map<*, *>) {
+                                                val x = (item["x"] as? Number)?.toInt() ?: 0
+                                                val y = (item["y"] as? Number)?.toInt() ?: 0
+                                                val level = 0
+                                                TileOffset(x, y, level)
+                                            } else {
+                                                null
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            barricadeOffsets = barricadeOffsetsLocal
+                            gateOffsets = gateOffsetsLocal
+                        }
                     }
                 }
 
@@ -515,7 +566,7 @@ class PestControl : Script {
             difficulties.size
         }
 
-        config = PestControlConfig(difficulties, pestData, locations!!, timers!!, limits!!)
+        config = PestControlConfig(difficulties, pestData, locations!!, timers!!, limits!!, barricadeOffsets, gateOffsets)
 
         // Log loaded config information
         log.info { "Pest Control Loaded configuration:" }
@@ -564,6 +615,7 @@ class PestControl : Script {
         knightHealth = config.limits.knightHealth
         maxPestsPerPortal = config.limits.maxPestsPerPortal
         maxPestsNearKnight = config.limits.maxPestsNearKnight
+        this.barricadeOffsets = config.barricadeOffsets
 
         // Initialize lobbies for each difficulty
         for (difficultyName in config.difficulties.keys) {
@@ -908,6 +960,25 @@ class PestControl : Script {
         pestSpawnTimers[gameId] = pestSpawnIntervalSeconds
         shieldDropTimers[gameId] = firstShieldDropSeconds
 
+        // Find and track barricades and gates in the instance (they exist in map data)
+        if (instanceTile != null) {
+            val regionBase = instanceTile
+            
+            // Track gates (ID 14233) from config offsets
+            for (offset in config.gateOffsets) {
+                val gateTile = regionBase.add(offset.x, offset.y, offset.level)
+                gameData.barricades[gateTile] = 14233 // Gate ID
+            }
+            
+            // Track barricades (ID 14227) from config offsets
+            for (offset in config.barricadeOffsets) {
+                val barricadeTile = regionBase.add(offset.x, offset.y, offset.level)
+                gameData.barricades[barricadeTile] = 14227 // Barricade ID
+            }
+            
+            log.debug { "Found ${config.gateOffsets.size} gates and ${config.barricadeOffsets.size} barricades for game $gameId" }
+        }
+
         // Spawn NPCs in the instance after instances are created
         if (instanceTile != null) {
             spawnGameNPCs(gameData, instanceTile)
@@ -1072,37 +1143,174 @@ class PestControl : Script {
                 log.debug { "PEST TARGETING: Processing ${gameData.pests.size} active pests, knight=$knight, knight.index=${knight.index}, knight.dead=${knight.dead}" }
                 for (pest in gameData.pests) {
                     if (pest.index == -1 || pest.dead) continue
+                    
+                    // Check line of sight for ranged pests during combat (cancel if lost)
+                    val pestId = pest.id
+                    val isRangedPest = pestId.contains("defiler") || pestId.contains("torcher")
+                    if (isRangedPest && pest.mode is CombatMovement) {
+                        val combatTarget = (pest.mode as CombatMovement).target
+                        if (combatTarget != null) {
+                            val hasLineOfSight = lineValidator.hasLineOfSight(
+                                level = pest.tile.level,
+                                srcX = pest.tile.x,
+                                srcZ = pest.tile.y,
+                                destX = combatTarget.tile.x,
+                                destZ = combatTarget.tile.y,
+                                srcSize = 1,
+                                destWidth = 1,
+                                destHeight = 1
+                            )
+                            if (!hasLineOfSight) {
+                                log.debug { "PEST LINE OF SIGHT: Pest ${pest.id} lost line of sight to target, canceling combat" }
+                                pest.mode = EmptyMode
+                                continue
+                            }
+                        }
+                    }
+                    
                     val alreadyTargetingKnight =
                         pest.mode is CombatMovement && (pest.mode as CombatMovement).target == knight
                     if (alreadyTargetingKnight) {
                         log.debug { "PEST TARGETING: Pest ${pest.id} already targeting knight, skipping" }
                         continue
                     }
-                    val pestId = pest.id
                     // Skip spinners - they prioritize healing their portal
                     if (pestId.contains("spinner")) {
                         log.debug { "PEST TARGETING: Pest ${pest.id} is spinner, skipping (prioritizes portal healing)" }
                         continue
                     }
                     
+                    // Ravager logic: target and break barricades (based on 2009scape PCRavagerNPC)
+                    if (pestId.contains("ravager")) {
+                        log.debug { "RAVAGER: Pest ${pest.id} at ${pest.tile} checking for barricades, total barricades: ${gameData.barricades.size}" }
+                        
+                        // Ravagers prioritize barricades over combat
+                        // Find nearby barricade to target (within rendering distance / 3, similar to 2009scape)
+                        val nearbyBarricade = gameData.barricades.keys.firstOrNull { barricadeTile ->
+                            val distance = pest.tile.distanceTo(barricadeTile)
+                            log.debug { "RAVAGER: Checking barricade at $barricadeTile, distance: $distance" }
+                            distance <= 15 // Rendering distance / 3
+                        }
+                        
+                        log.debug { "RAVAGER: Pest ${pest.id} found barricade: ${nearbyBarricade != null}" }
+                        
+                        if (nearbyBarricade != null) {
+                            // Check if ravager is at the barricade and ready to attack
+                            val distanceToBarricade = pest.tile.distanceTo(nearbyBarricade)
+                            val lastAttackTick = pest["ravager_last_attack"] as? Int ?: 0
+                            val currentTick = GameLoop.tick
+                            val attackCooldown = 5 // 5 ticks (~3 seconds) between attacks (matches 2009scape)
+                            val timeSinceLastAttack = currentTick - lastAttackTick
+                            
+                            log.debug { "RAVAGER: Pest ${pest.id} distance to barricade: $distanceToBarricade, time since last attack: $timeSinceLastAttack, cooldown: $attackCooldown, mode=${pest.mode}" }
+                            
+                            if (distanceToBarricade <= 1 && timeSinceLastAttack >= attackCooldown) {
+                                // Attack the barricade
+                                val currentBarricadeId = gameData.barricades[nearbyBarricade] ?: 14227
+                                log.debug { "RAVAGER: Pest ${pest.id} attacking barricade at $nearbyBarricade, current ID: $currentBarricadeId" }
+                                
+                                // Play attack animation
+                                pest.anim("ravager_attack")
+                                
+                                // Calculate new barricade ID (damaged state)
+                                // 14227-14232 are barricades, 14233-14248 are gates
+                                // When damaged: newId = currentId + (currentId < 14233 ? 3 : 4)
+                                val newBarricadeId = currentBarricadeId + (if (currentBarricadeId < 14233) 3 else 4)
+                                
+                                // Check if barricade is destroyed (INVALID_OBJECT_IDS from 2009scape)
+                                val invalidObjectIds = setOf(14230, 14231, 14232, 14245, 14246, 14247, 14248)
+                                val isDestroyed = newBarricadeId in invalidObjectIds
+                                
+                                log.debug { "RAVAGER ATTACK: Pest ${pest.id} attacking barricade at $nearbyBarricade, currentId=$currentBarricadeId, newId=$newBarricadeId, destroyed=$isDestroyed" }
+                                
+                                // Update barricade state
+                                if (isDestroyed) {
+                                    // Remove destroyed barricade
+                                    gameData.barricades.remove(nearbyBarricade)
+                                    log.debug { "RAVAGER ATTACK: Barricade at $nearbyBarricade destroyed and removed" }
+                                } else {
+                                    // Update to damaged state
+                                    gameData.barricades[nearbyBarricade] = newBarricadeId
+                                    // Note: GameObjects.get() is private, so we can't do visual replacement
+                                    // The state is tracked in memory for logic purposes
+                                    log.debug { "RAVAGER ATTACK: Barricade at $nearbyBarricade damaged to ID $newBarricadeId" }
+                                }
+                                
+                                // Set attack cooldown
+                                pest["ravager_last_attack"] = currentTick
+                                
+                                // Face the barricade
+                                pest.face(nearbyBarricade)
+                                log.debug { "RAVAGER: Pest ${pest.id} faced barricade at $nearbyBarricade" }
+                            } else if (distanceToBarricade > 1) {
+                                // Check if we need to walk to the barricade
+                                val currentTarget = pest["ravager_target"] as? Tile
+                                val shouldWalk = currentTarget != nearbyBarricade
+                                
+                                log.debug { "RAVAGER: Pest ${pest.id} currentTarget=$currentTarget, barricade=$nearbyBarricade, shouldWalk=$shouldWalk" }
+                                
+                                if (shouldWalk) {
+                                    log.debug { "RAVAGER: Pest ${pest.id} walking to barricade at $nearbyBarricade (distance=$distanceToBarricade)" }
+                                    pest.walkTo(nearbyBarricade)
+                                    pest["ravager_target"] = nearbyBarricade
+                                    log.debug { "RAVAGER WALK: Pest ${pest.id} walking to barricade at $nearbyBarricade (distance=$distanceToBarricade)" }
+                                } else {
+                                    log.debug { "RAVAGER: Pest ${pest.id} already targeting this barricade, waiting to arrive" }
+                                }
+                            } else {
+                                log.debug { "RAVAGER: Pest ${pest.id} at barricade but on cooldown (time since last attack: $timeSinceLastAttack, cooldown: $attackCooldown)" }
+                            }
+                            
+                            // Ravager is targeting a barricade, skip normal targeting
+                            log.debug { "RAVAGER: Pest ${pest.id} skipping normal targeting (barricade focus)" }
+                            continue
+                        }
+                        log.debug { "RAVAGER: Pest ${pest.id} no nearby barricade, falling through to normal targeting" }
+                        // If no barricade nearby, fall through to normal targeting
+                    }
+                    
                     // Matrix4-style targeting: 33% chance to target knight, otherwise target nearby players
                     val targetKnight = random.nextInt(3) == 0
                     log.debug { "PEST TARGETING: Pest ${pest.id} roll: targetKnight=$targetKnight (random=${random.nextInt(3)}), pest.mode=${pest.mode}, pest.underAttack=${pest.underAttack}" }
                     
-                    if (targetKnight) {
-                        log.debug { "PEST TARGETING: Directing pest ${pest.id} to attack void_knight" }
-                        combat(pest, knight)
-                    } else {
+                    val target = if (targetKnight) knight else {
                         // Find and attack nearby players
-                        val nearbyPlayer = gameData.players.firstOrNull { player ->
+                        gameData.players.firstOrNull { player ->
                             !player.dead && player.tile.distanceTo(pest.tile) <= 10
                         }
-                        if (nearbyPlayer != null) {
-                            log.debug { "PEST TARGETING: Directing pest ${pest.id} to attack player ${nearbyPlayer.name} (distance=${pest.tile.distanceTo(nearbyPlayer.tile)})" }
-                            combat(pest, nearbyPlayer)
+                    }
+                    
+                    if (target != null) {
+                        val targetName = if (target is Player) target.name else "void_knight"
+                        log.debug { "PEST TARGETING: Directing pest ${pest.id} to attack $targetName (distance=${pest.tile.distanceTo(target.tile)})" }
+                        
+                        // Defilers and torchers use ranged attacks - check line of sight
+                        // They should not be able to hit through barricades/gates (verified with 2009scape)
+                        val isRangedPest = pestId.contains("defiler") || pestId.contains("torcher")
+                        val hasLineOfSight = if (isRangedPest) {
+                            lineValidator.hasLineOfSight(
+                                level = pest.tile.level,
+                                srcX = pest.tile.x,
+                                srcZ = pest.tile.y,
+                                destX = target.tile.x,
+                                destZ = target.tile.y,
+                                srcSize = 1,
+                                destWidth = 1,
+                                destHeight = 1
+                            )
                         } else {
-                            log.debug { "PEST TARGETING: Pest ${pest.id} found no nearby players within distance 10" }
+                            true // Melee pests don't need line of sight (they can walk to target)
                         }
+                        
+                        if (hasLineOfSight) {
+                            // Torchers and defilers use ranged attacks - combat system will select appropriate style
+                            // based on their combat definitions (torcher.magic, defiler.range) with approach=false
+                            combat(pest, target)
+                        } else {
+                            log.debug { "PEST TARGETING: Pest ${pest.id} (ranged) has no line of sight to $targetName, skipping attack" }
+                        }
+                    } else {
+                        log.debug { "PEST TARGETING: Pest ${pest.id} found no valid target" }
                     }
                 }
             } else {
