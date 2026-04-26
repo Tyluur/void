@@ -1,8 +1,221 @@
-fix(pest-control): align interface 1011 component handlers with cache dump
+[pest_control_rewards]
+id = 1011
 
-Optional body:
+[.commendations]
+id = 61
 
-align tab button handlers to option-bearing components from cache
-fix default Experience tab visibility using Void sendVisibility semantics
-map charm 1x/10x/all to distinct component ids (324/326/328, 339/341/343, 354/356/358, 369/371/373)
-harden purchase flows to prevent point loss when inventory cannot receive rewards
+[.attack_xp_1]
+id = 68
+
+[.attack_xp_10]
+id = 86
+
+[.attack_xp_100]
+id = 88
+
+[.strength_xp_1]
+id = 100
+
+[.strength_xp_10]
+id = 102
+
+[.strength_xp_100]
+id = 104
+
+[.defence_xp_1]
+id = 116
+
+[.defence_xp_10]
+id = 118
+
+[.defence_xp_100]
+id = 120
+
+[.constitution_xp_1]
+id = 132
+
+[.constitution_xp_10]
+id = 134
+
+[.constitution_xp_100]
+id = 136
+
+[.ranged_xp_1]
+id = 148
+
+[.ranged_xp_10]
+id = 150
+
+[.ranged_xp_100]
+id = 152
+
+[.magic_xp_1]
+id = 164
+
+[.magic_xp_10]
+id = 166
+
+[.magic_xp_100]
+id = 168
+
+[.prayer_xp_1]
+id = 180
+
+[.prayer_xp_10]
+id = 182
+
+[.prayer_xp_100]
+id = 184
+
+[.void_melee_helm]
+id = 15
+
+[.void_top]
+id = 220
+
+[.void_robe]
+id = 232
+
+[.void_gloves]
+id = 244
+
+[.void_mace]
+id = 256
+
+[.void_ranger_helm]
+id = 196
+
+[.void_mage_helm]
+id = 208
+
+[.void_deflector]
+id = 268
+
+[.void_seal]
+id = 280
+
+[.gold_charm]
+id = 324
+
+[.gold_charm_10]
+id = 326
+
+[.gold_charm_all]
+id = 328
+
+[.green_charm]
+id = 339
+
+[.green_charm_10]
+id = 341
+
+[.green_charm_all]
+id = 343
+
+[.crimson_charm]
+id = 354
+
+[.crimson_charm_10]
+id = 356
+
+[.crimson_charm_all]
+id = 358
+
+[.blue_charm]
+id = 369
+
+[.blue_charm_10]
+id = 371
+
+[.blue_charm_all]
+id = 373
+
+[.herblore_pack]
+id = 291
+
+[.mineral_pack]
+id = 302
+
+[.seed_pack]
+id = 313
+
+[.experience_tab]
+id = 20
+
+[.consumables_tab]
+id = 24
+
+[.equipment_tab_2]
+id = 29
+
+[.consumables_tab_2]
+id = 31
+
+[.experience_tab_3]
+id = 73
+
+[.equipment_tab_3]
+id = 75
+
+[.tab_buttons_container]
+id = 69
+
+[.experience_tab_container]
+id = 63
+
+[.equipment_consumables_tab_container]
+id = 70
+
+[pest_control_waiting]
+id = 407
+type = "overlay"
+
+[.title]
+id = 3
+
+[.departure]
+id = 13
+
+[.players_ready]
+id = 14
+
+[.commendations]
+id = 16
+
+[pest_control_playing]
+id = 408
+type = "overlay"
+
+[.time]
+id = 0
+
+[.knight_health]
+id = 1
+
+[.activity]
+id = 11
+
+[.portal_purple_health]
+id = 13
+
+[.portal_blue_health]
+id = 14
+
+[.portal_yellow_health]
+id = 15
+
+[.portal_red_health]
+id = 16
+
+[.purple_shield]
+id = 18
+
+[.blue_shield]
+id = 20
+
+[.yellow_shield]
+id = 22
+
+[.red_shield]
+id = 24
+
