@@ -103,6 +103,7 @@ data class LimitConfig(
 class PestControl : Script {
     companion object {
         private val log = InlineLogger()
+        private var nextGameId = 0
     }
 
     // Debug flag - set to true to skip 30-second lobby timer and start game immediately
@@ -121,10 +122,11 @@ class PestControl : Script {
      */
     private fun pestDataConfig(name: String): PestDataConfig? = config.pestData[name.lowercase()]
 
-    private val activeGames = mutableMapOf<Player, PestGameData>()
-    private val gameTimers = mutableMapOf<Player, Int>()
-    private val pestSpawnTimers = mutableMapOf<Player, Int>()
-    private val shieldDropTimers = mutableMapOf<Player, Int>()
+    private val activeGames = mutableMapOf<Int, PestGameData>()
+    private val gameTimers = mutableMapOf<Int, Int>()
+    private val pestSpawnTimers = mutableMapOf<Int, Int>()
+    private val shieldDropTimers = mutableMapOf<Int, Int>()
+    private val playerToGameId = mutableMapOf<Player, Int>()
     private val lobbies = mutableMapOf<String, MutableList<Player>>()
     private val lobbyTimers = mutableMapOf<String, Int>()
 
@@ -142,10 +144,13 @@ class PestControl : Script {
         interfaceClosed("pest_control_playing") {
             // Check if player is still in an active game
             if (this["pest_control_game_active"] as? Boolean == true) {
-                val gameData = activeGames[this]
-                if (gameData != null) {
-                    this.interfaces.open("pest_control_playing")
-                    updateGameInterface(this, gameData)
+                val gameId = playerToGameId[this]
+                if (gameId != null) {
+                    val gameData = activeGames[gameId]
+                    if (gameData != null) {
+                        this.interfaces.open("pest_control_playing")
+                        updateGameInterface(this, gameData)
+                    }
                 }
             }
         }
@@ -191,7 +196,7 @@ class PestControl : Script {
             }
             // Find if this NPC is part of an active Pest Control game
             val gameData = activeGames.values.find { game ->
-                game.portalNPCs.contains(target) || game.players.any { player ->
+                game.portalNPCs.contains(target) || game.pests.contains(target) || game.players.any { player ->
                     player.tile.region == target.tile.region
                 }
             }
@@ -319,6 +324,7 @@ class PestControl : Script {
      * @property instanceTile The world tile where the instance region starts
      */
     data class PestGameData(
+        val gameId: Int,
         val difficultyName: String,
         val difficultyConfig: DifficultyConfig,
         val pestDataConfig: PestDataConfig,
@@ -648,17 +654,24 @@ class PestControl : Script {
             }
 
             if (get("pest_control_game_active", false)) {
-                val gameData = activeGames[this]
-                if (gameData != null) {
-                    // Teleport player to entrance point instead of removing them
-                    val diffConfig = difficultyConfig(difficultyName)
-                    if (diffConfig != null) {
-                        val entranceTile = Tile(diffConfig.exitTileX, diffConfig.exitTileY, diffConfig.exitTileLevel)
-                        tele(entranceTile)
-                        message("Oh dear, you died! You have been returned to the entrance.", ChatType.Game)
+                val gameId = playerToGameId[this]
+                if (gameId != null) {
+                    val gameData = activeGames[gameId]
+                    if (gameData != null) {
+                        // Teleport player to entrance point instead of removing them
+                        val diffConfig = difficultyConfig(difficultyName)
+                        if (diffConfig != null) {
+                            val entranceTile = Tile(diffConfig.exitTileX, diffConfig.exitTileY, diffConfig.exitTileLevel)
+                            tele(entranceTile)
+                            message("Oh dear, you died! You have been returned to the entrance.", ChatType.Game)
+                        }
+                        // Remove player from game data
+                        gameData.players.remove(this)
+                        // Remove player-to-game mapping
+                        playerToGameId.remove(this)
+                        // Keep player in the game, don't remove them
+                        // Don't end the game if players die - only end if knight dies or time runs out
                     }
-                    // Keep player in the game, don't remove them
-                    // Don't end the game if players die - only end if knight dies or time runs out
                 }
                 // Don't remove player from active games - they can re-enter
                 // Just clear their game state so they can re-enter
@@ -821,13 +834,25 @@ class PestControl : Script {
         val pestConfig = pestDataConfig(difficultyName) ?: return
 
         synchronized(lobby) {
-            players = lobby.toList()
-            lobby.clear()
-            lobbyTimers[difficultyName] = lobbyTimerSeconds
+            // Take up to 25 players from the lobby (max per game)
+            // If there are more players, they'll wait for the next game
+            val playersToTake = minOf(lobby.size, 25)
+            players = lobby.take(playersToTake)
+            repeat(playersToTake) {
+                lobby.removeAt(0)
+            }
+            // Reset lobby timer if there are still players waiting
+            if (lobby.isNotEmpty()) {
+                lobbyTimers[difficultyName] = if (DEBUG_MODE) 1 else lobbyTimerSeconds
+            }
         }
+
+        // Generate unique game ID
+        val gameId = nextGameId++
 
         // Create game data for this instance
         val gameData = PestGameData(
+            gameId = gameId,
             difficultyName = difficultyName,
             difficultyConfig = diffConfig,
             pestDataConfig = pestConfig,
@@ -872,14 +897,16 @@ class PestControl : Script {
             player["pest_control_game_active"] = true
             player.remove<String>("pest_control_in_lobby")
 
-            // Track game state per player
-            activeGames[player] = gameData
-            gameTimers[player] = gameData.timeRemaining
-            pestSpawnTimers[player] = pestSpawnIntervalSeconds
-            shieldDropTimers[player] = firstShieldDropSeconds
-
+            // Track player to game ID mapping
+            playerToGameId[player] = gameId
             player.message("Pest Control game starting!", ChatType.Game)
         }
+
+        // Store game data and timers using game ID
+        activeGames[gameId] = gameData
+        gameTimers[gameId] = gameData.timeRemaining
+        pestSpawnTimers[gameId] = pestSpawnIntervalSeconds
+        shieldDropTimers[gameId] = firstShieldDropSeconds
 
         // Spawn NPCs in the instance after instances are created
         if (instanceTile != null) {
@@ -945,27 +972,27 @@ class PestControl : Script {
      * Called every second by the game timer.
      */
     private fun updateGameTimers() {
-        val gamesToRemove = mutableListOf<Player>()
+        val gamesToRemove = mutableListOf<Int>()
 
-        for ((player, gameData) in activeGames) {
-            val timer = gameTimers[player] ?: continue
-            val pestTimer = pestSpawnTimers[player] ?: continue
-            val shieldTimer = shieldDropTimers[player] ?: continue
+        for ((gameId, gameData) in activeGames) {
+            val timer = gameTimers[gameId] ?: continue
+            val pestTimer = pestSpawnTimers[gameId] ?: continue
+            val shieldTimer = shieldDropTimers[gameId] ?: continue
 
             // Decrement timer
-            gameTimers[player] = timer - 1
+            gameTimers[gameId] = timer - 1
             gameData.timeRemaining = timer - 1
 
             // Decrement pest spawn timer
-            pestSpawnTimers[player] = pestTimer - 1
+            pestSpawnTimers[gameId] = pestTimer - 1
 
             // Decrement shield drop timer
-            shieldDropTimers[player] = shieldTimer - 1
+            shieldDropTimers[gameId] = shieldTimer - 1
 
             // Spawn pests when timer reaches 0
             if (pestTimer <= 0) {
                 spawnPests(gameData)
-                pestSpawnTimers[player] = pestSpawnIntervalSeconds
+                pestSpawnTimers[gameId] = pestSpawnIntervalSeconds
             }
 
             // Spinners prioritize healing their assigned portal - ALWAYS walk to portal, only heal if damaged
@@ -1086,7 +1113,7 @@ class PestControl : Script {
             if (shieldTimer <= 0 && gameData.shieldsDropped < 4) {
                 dropPortalShield(gameData)
                 // Use subsequent interval after first shield drops
-                shieldDropTimers[player] = subsequentShieldDropIntervalSeconds
+                shieldDropTimers[gameId] = subsequentShieldDropIntervalSeconds
             }
 
             // Update knight health from actual NPC constitution levels
@@ -1103,24 +1130,24 @@ class PestControl : Script {
             if (timer <= 0) {
                 // Time's up - lose
                 endGame(gameData, false)
-                gamesToRemove.addAll(gameData.players)
+                gamesToRemove.add(gameId)
             } else if (gameData.knightHealth <= 0) {
                 // Knight died - lose
                 endGame(gameData, false)
-                gamesToRemove.addAll(gameData.players)
+                gamesToRemove.add(gameId)
             } else if (gameData.portalsDestroyed >= 4) {
                 // All portals destroyed - win
                 endGame(gameData, true)
-                gamesToRemove.addAll(gameData.players)
+                gamesToRemove.add(gameId)
             }
         }
 
         // Clean up completed games
-        for (player in gamesToRemove) {
-            activeGames.remove(player)
-            gameTimers.remove(player)
-            pestSpawnTimers.remove(player)
-            shieldDropTimers.remove(player)
+        for (gameId in gamesToRemove) {
+            activeGames.remove(gameId)
+            gameTimers.remove(gameId)
+            pestSpawnTimers.remove(gameId)
+            shieldDropTimers.remove(gameId)
         }
     }
 
@@ -1351,6 +1378,9 @@ class PestControl : Script {
             player.clearInstance()
             player.remove<String>("pest_control_difficulty")
 
+            // Remove player-to-game mapping
+            playerToGameId.remove(player)
+
             if (won) {
                 val currentPoints = player["pest_control_points", 0]
                 player["pest_control_points"] = currentPoints + points
@@ -1364,6 +1394,22 @@ class PestControl : Script {
 
             // Teleport back to exit tile
             player.tele(exitTile)
+        }
+
+        // Clean up game instance data
+        val gameId = gameData.gameId
+        activeGames.remove(gameId)
+        gameTimers.remove(gameId)
+        pestSpawnTimers.remove(gameId)
+        shieldDropTimers.remove(gameId)
+
+        // Clean up NPCs
+        gameData.knightNPC?.let { NPCs.remove(it) }
+        for (portal in gameData.portalNPCs) {
+            portal?.let { NPCs.remove(it) }
+        }
+        for (pest in gameData.pests) {
+            NPCs.remove(pest)
         }
     }
 
@@ -1403,18 +1449,19 @@ class PestControl : Script {
 
         if (player["pest_control_game_active", false]) {
             // Clean up instance and game state
-            val gameData = activeGames[player]
-            if (gameData != null) {
-                gameData.players.remove(player)
-                if (gameData.players.isEmpty()) {
-                    // Last player left, end game as loss
-                    endGame(gameData, false)
+            val gameId = playerToGameId[player]
+            if (gameId != null) {
+                val gameData = activeGames[gameId]
+                if (gameData != null) {
+                    gameData.players.remove(player)
+                    if (gameData.players.isEmpty()) {
+                        // Last player left, end game as loss
+                        endGame(gameData, false)
+                    }
                 }
+                // Remove player-to-game mapping
+                playerToGameId.remove(player)
             }
-            activeGames.remove(player)
-            gameTimers.remove(player)
-            pestSpawnTimers.remove(player)
-            shieldDropTimers.remove(player)
             player.clearInstance()
             player.interfaces.close("pest_control_waiting")
             player.interfaces.close("pest_control_playing")
