@@ -143,24 +143,14 @@ class CommendationExchange : Script, InterfaceApi {
                 voidEquipment, charms, resourcePacks
             )
         }
-        
-        fun openExchangeShop(player: Player) {
-            player.interfaces.open("pest_control_rewards")
-            refreshPoints(player)
-            player.message("XP rewards are x10 the amount displayed.", ChatType.Game)
-        }
-
-        private fun refreshPoints(player: Player) {
-            player.variables.send("pest_control_points")
-        }
     }
 
     init {
         loadConfig()
-        
+
         // Register interface button handlers
         registerButtonHandlers()
-        
+
         // Register NPC interaction handlers
         npcOperate("Talk-to", "void_knight_2_pest_control") { (target) ->
             openExchangeShop(this)
@@ -170,9 +160,57 @@ class CommendationExchange : Script, InterfaceApi {
         }
     }
 
+    private fun openExchangeShop(player: Player) {
+        player.interfaces.open("pest_control_rewards")
+        refreshPoints(player)
+        showExperienceTab(player)
+    }
+
+    private fun refreshPoints(player: Player) {
+        player.variables.send("pest_control_points")
+    }
+
+    private fun showExperienceTab(player: Player) {
+        // Experience tab: hide tab buttons (69) and equipment/consumables (70), show experience (63)
+        player.interfaces.sendVisibility("pest_control_rewards", "tab_buttons_container", false)
+        player.interfaces.sendVisibility("pest_control_rewards", "equipment_consumables_tab_container", false)
+    }
+
+    private fun showEquipmentTab(player: Player) {
+        // Equipment tab: hide equipment/consumables (70), show tab buttons + void equipment (69)
+        player.interfaces.sendVisibility("pest_control_rewards", "equipment_consumables_tab_container", false)
+        player.interfaces.sendVisibility("pest_control_rewards", "tab_buttons_container", true)
+    }
+
+    private fun showConsumablesTab(player: Player) {
+        // Consumables tab: show equipment/consumables (70), hide tab buttons (69)
+        player.interfaces.sendVisibility("pest_control_rewards", "equipment_consumables_tab_container", true)
+        player.interfaces.sendVisibility("pest_control_rewards", "tab_buttons_container", false)
+    }
+
     private fun registerButtonHandlers() {
         val cfg = config
-        
+
+        // Tab switching - matching Lotica's exact logic
+        interfaceOption("Experience", "pest_control_rewards:experience_tab") {
+            showExperienceTab(this)
+        }
+        interfaceOption("Experience", "pest_control_rewards:experience_tab_3") {
+            showExperienceTab(this)
+        }
+        interfaceOption("Equipment", "pest_control_rewards:equipment_tab_2") {
+            showEquipmentTab(this)
+        }
+        interfaceOption("Equipment", "pest_control_rewards:equipment_tab_3") {
+            showEquipmentTab(this)
+        }
+        interfaceOption("Consumables", "pest_control_rewards:consumables_tab") {
+            showConsumablesTab(this)
+        }
+        interfaceOption("Consumables", "pest_control_rewards:consumables_tab_2") {
+            showConsumablesTab(this)
+        }
+
         // XP rewards for Attack
         interfaceOption("Exchange-1", "pest_control_rewards:attack_xp_1") {
             log.debug { "Attack XP 1x triggered" }
@@ -254,28 +292,28 @@ class CommendationExchange : Script, InterfaceApi {
         }
 
         // Void equipment buttons
-        interfaceOption("Exchange", "pest_control_rewards:void_top") {
+        interfaceOption("Exchange", "pest_control_rewards:void_melee_helm") {
             addVoidItem(this, 0)
         }
-        interfaceOption("Exchange", "pest_control_rewards:void_robe") {
+        interfaceOption("Exchange", "pest_control_rewards:void_ranger_helm") {
             addVoidItem(this, 1)
         }
-        interfaceOption("Exchange", "pest_control_rewards:void_gloves") {
+        interfaceOption("Exchange", "pest_control_rewards:void_mage_helm") {
             addVoidItem(this, 2)
         }
-        interfaceOption("Exchange", "pest_control_rewards:void_mace") {
+        interfaceOption("Exchange", "pest_control_rewards:void_top") {
             addVoidItem(this, 3)
         }
-        interfaceOption("Exchange", "pest_control_rewards:void_ranger_helm") {
+        interfaceOption("Exchange", "pest_control_rewards:void_robe") {
             addVoidItem(this, 4)
         }
-        interfaceOption("Exchange", "pest_control_rewards:void_mage_helm") {
+        interfaceOption("Exchange", "pest_control_rewards:void_gloves") {
             addVoidItem(this, 5)
         }
-        interfaceOption("Exchange", "pest_control_rewards:void_ranger_top") {
+        interfaceOption("Exchange", "pest_control_rewards:void_mace") {
             addVoidItem(this, 6)
         }
-        interfaceOption("Exchange", "pest_control_rewards:void_mage_top") {
+        interfaceOption("Exchange", "pest_control_rewards:void_deflector") {
             addVoidItem(this, 7)
         }
         interfaceOption("Exchange", "pest_control_rewards:void_seal") {
@@ -286,37 +324,37 @@ class CommendationExchange : Script, InterfaceApi {
         interfaceOption("Exchange-1", "pest_control_rewards:gold_charm") {
             addCharm(this, 0, RATE_ONE)
         }
-        interfaceOption("Exchange-10", "pest_control_rewards:gold_charm") {
+        interfaceOption("Exchange-10", "pest_control_rewards:gold_charm_10") {
             addCharm(this, 0, RATE_TEN)
         }
-        interfaceOption("Exchange-All", "pest_control_rewards:gold_charm") {
+        interfaceOption("Exchange-All", "pest_control_rewards:gold_charm_all") {
             addCharm(this, 0, RATE_HUNDRED)
         }
         interfaceOption("Exchange-1", "pest_control_rewards:green_charm") {
             addCharm(this, 1, RATE_ONE)
         }
-        interfaceOption("Exchange-10", "pest_control_rewards:green_charm") {
+        interfaceOption("Exchange-10", "pest_control_rewards:green_charm_10") {
             addCharm(this, 1, RATE_TEN)
         }
-        interfaceOption("Exchange-All", "pest_control_rewards:green_charm") {
+        interfaceOption("Exchange-All", "pest_control_rewards:green_charm_all") {
             addCharm(this, 1, RATE_HUNDRED)
         }
         interfaceOption("Exchange-1", "pest_control_rewards:crimson_charm") {
             addCharm(this, 2, RATE_ONE)
         }
-        interfaceOption("Exchange-10", "pest_control_rewards:crimson_charm") {
+        interfaceOption("Exchange-10", "pest_control_rewards:crimson_charm_10") {
             addCharm(this, 2, RATE_TEN)
         }
-        interfaceOption("Exchange-All", "pest_control_rewards:crimson_charm") {
+        interfaceOption("Exchange-All", "pest_control_rewards:crimson_charm_all") {
             addCharm(this, 2, RATE_HUNDRED)
         }
         interfaceOption("Exchange-1", "pest_control_rewards:blue_charm") {
             addCharm(this, 3, RATE_ONE)
         }
-        interfaceOption("Exchange-10", "pest_control_rewards:blue_charm") {
+        interfaceOption("Exchange-10", "pest_control_rewards:blue_charm_10") {
             addCharm(this, 3, RATE_TEN)
         }
-        interfaceOption("Exchange-All", "pest_control_rewards:blue_charm") {
+        interfaceOption("Exchange-All", "pest_control_rewards:blue_charm_all") {
             addCharm(this, 3, RATE_HUNDRED)
         }
 
@@ -374,6 +412,10 @@ class CommendationExchange : Script, InterfaceApi {
             player.message("You need an attack, strength, defence, constitution, range, and magic level of 42, and a prayer level of 22 in order to purchase void equipment.", ChatType.Game)
             return
         }
+        if (player.inventory.spaces <= 0) {
+            player.message("You don't have enough inventory space.", ChatType.Game)
+            return
+        }
         val cost = cfg.costs[index]
         if (!exchangeCommendation(player, cost)) {
             return
@@ -395,7 +437,13 @@ class CommendationExchange : Script, InterfaceApi {
 
     private fun addCharm(player: Player, index: Int, rate: Int) {
         val cfg = config
-        val actualRate = if (rate == 100) player.inventory.spaces else rate
+        val freeSlots = player.inventory.spaces
+        val requestedRate = if (rate == RATE_HUNDRED) freeSlots else rate
+        val actualRate = min(requestedRate, freeSlots)
+        if (actualRate <= 0) {
+            player.message("You don't have enough inventory space.", ChatType.Game)
+            return
+        }
         var exchanged = 0
         for (i in 0 until actualRate) {
             if (!exchangeCommendation(player, CHARM_COST)) {
@@ -425,32 +473,46 @@ class CommendationExchange : Script, InterfaceApi {
             player.message("You need a ${packConfig.skill} level of ${packConfig.level} in order to purchase a ${packConfig.skill} pack.", ChatType.Game)
             return
         }
+        var remainingSlots = player.inventory.spaces
+        if (remainingSlots <= 0) {
+            player.message("You don't have enough inventory space.", ChatType.Game)
+            return
+        }
+        val additions = mutableListOf<Pair<String, Int>>()
+        fun queue(item: String, amount: Int) {
+            val toAdd = min(amount, remainingSlots)
+            if (toAdd > 0) {
+                additions.add(item to toAdd)
+                remainingSlots -= toAdd
+            }
+        }
+        when (packConfig.skill) {
+            "herblore" -> {
+                queue("clean_guam", 5)
+                queue("clean_irit", 4)
+                queue("clean_avantoe", 3)
+                queue("clean_kwuarm", 2)
+            }
+            "mining" -> {
+                queue("copper_ore", 20)
+                queue("coal", 30)
+            }
+            "farming" -> {
+                queue("potato_seed", 5)
+                queue("onion_seed", 3)
+                queue("cabbage_seed", 2)
+            }
+        }
+        if (additions.isEmpty()) {
+            player.message("You don't have enough inventory space.", ChatType.Game)
+            return
+        }
         if (!exchangeCommendation(player, packConfig.cost)) {
             return
         }
-        // Add items based on pack type (simplified implementation)
-        val freeSlots = player.inventory.spaces
-        when (packConfig.skill) {
-            "herblore" -> {
-                player.inventory.transaction {
-                    add("clean_guam", min(5, freeSlots))
-                    add("clean_irit", min(4, freeSlots))
-                    add("clean_avantoe", min(3, freeSlots))
-                    add("clean_kwuarm", min(2, freeSlots))
-                }
-            }
-            "mining" -> {
-                player.inventory.transaction {
-                    add("copper_ore", min(20, freeSlots))
-                    add("coal", min(30, freeSlots))
-                }
-            }
-            "farming" -> {
-                player.inventory.transaction {
-                    add("potato_seed", min(5, freeSlots))
-                    add("onion_seed", min(3, freeSlots))
-                    add("cabbage_seed", min(2, freeSlots))
-                }
+        player.inventory.transaction {
+            for ((item, amount) in additions) {
+                add(item, amount)
             }
         }
         when (player.inventory.transaction.error) {
