@@ -13,6 +13,60 @@ id = 86
 [.attack_xp_100]
 id = 88
 
+[.strength_xp_1]
+id = 100
+
+[.strength_xp_10]
+id = 102
+
+[.strength_xp_100]
+id = 104
+
+[.defence_xp_1]
+id = 116
+
+[.defence_xp_10]
+id = 118
+
+[.defence_xp_100]
+id = 120
+
+[.constitution_xp_1]
+id = 132
+
+[.constitution_xp_10]
+id = 134
+
+[.constitution_xp_100]
+id = 136
+
+[.ranged_xp_1]
+id = 148
+
+[.ranged_xp_10]
+id = 150
+
+[.ranged_xp_100]
+id = 152
+
+[.magic_xp_1]
+id = 164
+
+[.magic_xp_10]
+id = 166
+
+[.magic_xp_100]
+id = 168
+
+[.prayer_xp_1]
+id = 180
+
+[.prayer_xp_10]
+id = 182
+
+[.prayer_xp_100]
+id = 184
+
 [.void_top]
 id = 15
 

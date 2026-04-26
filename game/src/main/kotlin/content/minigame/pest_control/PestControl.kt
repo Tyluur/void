@@ -738,9 +738,7 @@ class PestControl : Script {
                 "Next Departure: $minutesLeft minutes ${if (minutesLeft % 2 != 0) "30 seconds" else ""}"
             )
             player.interfaces.sendText("pest_control_waiting", "players_ready", "Player's Ready: ${lobby.size}")
-            player.interfaces.sendText(
-                "pest_control_waiting", "commendations", "Commendations: ${player["pest_control_points", 0]}"
-            )
+            player.variables.send("pest_control_points")
         }
     }
 

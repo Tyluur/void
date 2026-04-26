@@ -1,5 +1,7 @@
 package content.minigame.pest_control
 
+import com.github.michaelbull.logging.InlineLogger
+import world.gregs.config.Config
 import world.gregs.voidps.engine.client.ui.InterfaceApi
 import world.gregs.voidps.engine.client.ui.open
 import world.gregs.voidps.engine.inv.inventory
@@ -16,32 +18,132 @@ import world.gregs.voidps.engine.inv.transact.operation.AddItem.add
 import kotlin.math.ceil
 import kotlin.math.min
 
+data class CommendationExchangeConfig(
+    val voidEquipment: VoidEquipmentConfig,
+    val charms: CharmsConfig,
+    val resourcePacks: ResourcePacksConfig
+)
+
+data class VoidEquipmentConfig(
+    val items: List<String>,
+    val costs: List<Int>
+)
+
+data class CharmsConfig(
+    val items: List<String>
+)
+
+data class ResourcePacksConfig(
+    val herblorePack: ResourcePackConfig,
+    val mineralPack: ResourcePackConfig,
+    val seedPack: ResourcePackConfig
+)
+
+data class ResourcePackConfig(
+    val cost: Int,
+    val skill: String,
+    val level: Int
+)
+
 class CommendationExchange : Script, InterfaceApi {
 
     companion object {
-        private const val INTERFACE = 1011
+        private val log = InlineLogger()
+        private lateinit var config: CommendationExchangeConfig
+        
+        // Obvious default values that don't need configuration
         private const val RATE_ONE = 1
         private const val RATE_TEN = 10
         private const val RATE_HUNDRED = 100
+        private const val CHARM_COST = 2
+        
+        fun loadConfig() {
+            var voidEquipment: VoidEquipmentConfig? = null
+            var charms: CharmsConfig? = null
+            var herblorePack: ResourcePackConfig? = null
+            var mineralPack: ResourcePackConfig? = null
+            var seedPack: ResourcePackConfig? = null
 
-        // XP related stuff
-        private val SKILL_BASE_COMPONENTS = listOf(100, 116, 132, 148, 164, 180)
-        private val SKILLS = listOf(
-            Skill.Strength, Skill.Defence, Skill.Constitution, Skill.Ranged, Skill.Magic, Skill.Prayer
-        )
+            Config.fileReader("./data/minigame/pest_control/commendation_exchange.config.toml") {
+                while (nextSection()) {
+                    val section = section()
+                    when (section) {
+                        "void_equipment" -> {
+                            var items = emptyList<String>()
+                            var costs = emptyList<Int>()
+                            while (nextPair()) {
+                                when (key()) {
+                                    "items" -> items = list().map { it as String }
+                                    "costs" -> costs = list().map { it as Int }
+                                }
+                            }
+                            voidEquipment = VoidEquipmentConfig(items, costs)
+                        }
+                        "charms" -> {
+                            var items = emptyList<String>()
+                            while (nextPair()) {
+                                when (key()) {
+                                    "items" -> items = list().map { it as String }
+                                }
+                            }
+                            charms = CharmsConfig(items)
+                        }
+                        "herblore_pack" -> {
+                            var cost = 0
+                            var skill = ""
+                            var level = 0
+                            while (nextPair()) {
+                                when (key()) {
+                                    "cost" -> cost = int()
+                                    "skill" -> skill = string()
+                                    "level" -> level = int()
+                                }
+                            }
+                            herblorePack = ResourcePackConfig(cost, skill, level)
+                        }
+                        "mineral_pack" -> {
+                            var cost = 0
+                            var skill = ""
+                            var level = 0
+                            while (nextPair()) {
+                                when (key()) {
+                                    "cost" -> cost = int()
+                                    "skill" -> skill = string()
+                                    "level" -> level = int()
+                                }
+                            }
+                            mineralPack = ResourcePackConfig(cost, skill, level)
+                        }
+                        "seed_pack" -> {
+                            var cost = 0
+                            var skill = ""
+                            var level = 0
+                            while (nextPair()) {
+                                when (key()) {
+                                    "cost" -> cost = int()
+                                    "skill" -> skill = string()
+                                    "level" -> level = int()
+                                }
+                            }
+                            seedPack = ResourcePackConfig(cost, skill, level)
+                        }
+                    }
+                }
+            }
 
-        // Void related stuff
-        private val VOID_BASE_COMPONENTS = listOf(15, 196, 208, 220, 232, 244, 256, 268, 280)
-        private val VOID_ITEMS = listOf(
-            "void_melee_helm_2", "void_ranger_helm_2", "void_mage_helm_2", "void_knight_top", "void_knight_robe", "void_knight_gloves", "void_knight_mace", "void_knight_deflector", "void_seal_8_8"
-        )
-        private val VOID_COSTS = listOf(200, 200, 200, 250, 250, 150, 250, 150, 10)
+            // Validate that all required values are loaded from TOML
+            require(voidEquipment != null) { "Missing required config: void_equipment" }
+            require(charms != null) { "Missing required config: charms" }
+            require(herblorePack != null) { "Missing required config: herblore_pack" }
+            require(mineralPack != null) { "Missing required config: mineral_pack" }
+            require(seedPack != null) { "Missing required config: seed_pack" }
 
-        // Charm related stuff
-        private val CHARM_BASE_COMPONENTS = listOf(324, 339, 354, 369)
-        private val CHARM_ITEMS = listOf("gold_charm", "green_charm", "crimson_charm", "blue_charm")
-        private val CHARM_COST = 2
-
+            val resourcePacks = ResourcePacksConfig(herblorePack, mineralPack, seedPack)
+            config = CommendationExchangeConfig(
+                voidEquipment, charms, resourcePacks
+            )
+        }
+        
         fun openExchangeShop(player: Player) {
             player.interfaces.open("pest_control_rewards")
             refreshPoints(player)
@@ -49,12 +151,13 @@ class CommendationExchange : Script, InterfaceApi {
         }
 
         private fun refreshPoints(player: Player) {
-            val points = player["pest_control_points", 0]
-            player.interfaces.sendText("pest_control_rewards", "commendations", "Commendations: $points")
+            player.variables.send("pest_control_points")
         }
     }
 
     init {
+        loadConfig()
+        
         // Register interface button handlers
         registerButtonHandlers()
         
@@ -68,84 +171,172 @@ class CommendationExchange : Script, InterfaceApi {
     }
 
     private fun registerButtonHandlers() {
-        // XP rewards for Attack (components 68, 86, 88)
-        interfaceOption(id = "pest_control_rewards:attack_xp_1", option = "Exchange") {
+        val cfg = config
+        
+        // XP rewards for Attack
+        interfaceOption("Exchange-1", "pest_control_rewards:attack_xp_1") {
+            log.debug { "Attack XP 1x triggered" }
             addXPForSkill(this, Skill.Attack, RATE_ONE)
         }
-        interfaceOption(id = "pest_control_rewards:attack_xp_10", option = "Exchange") {
+        interfaceOption("Exchange-10", "pest_control_rewards:attack_xp_10") {
+            log.debug { "Attack XP 10x triggered" }
             addXPForSkill(this, Skill.Attack, RATE_TEN)
         }
-        interfaceOption(id = "pest_control_rewards:attack_xp_100", option = "Exchange") {
+        interfaceOption("Exchange-100", "pest_control_rewards:attack_xp_100") {
+            log.debug { "Attack XP 100x triggered" }
             addXPForSkill(this, Skill.Attack, RATE_HUNDRED)
         }
 
+        // XP rewards for Strength
+        interfaceOption("Exchange-1", "pest_control_rewards:strength_xp_1") {
+            addXPForSkill(this, Skill.Strength, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:strength_xp_10") {
+            addXPForSkill(this, Skill.Strength, RATE_TEN)
+        }
+        interfaceOption("Exchange-100", "pest_control_rewards:strength_xp_100") {
+            addXPForSkill(this, Skill.Strength, RATE_HUNDRED)
+        }
+
+        // XP rewards for Defence
+        interfaceOption("Exchange-1", "pest_control_rewards:defence_xp_1") {
+            addXPForSkill(this, Skill.Defence, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:defence_xp_10") {
+            addXPForSkill(this, Skill.Defence, RATE_TEN)
+        }
+        interfaceOption("Exchange-100", "pest_control_rewards:defence_xp_100") {
+            addXPForSkill(this, Skill.Defence, RATE_HUNDRED)
+        }
+
+        // XP rewards for Constitution
+        interfaceOption("Exchange-1", "pest_control_rewards:constitution_xp_1") {
+            addXPForSkill(this, Skill.Constitution, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:constitution_xp_10") {
+            addXPForSkill(this, Skill.Constitution, RATE_TEN)
+        }
+        interfaceOption("Exchange-100", "pest_control_rewards:constitution_xp_100") {
+            addXPForSkill(this, Skill.Constitution, RATE_HUNDRED)
+        }
+
+        // XP rewards for Ranged
+        interfaceOption("Exchange-1", "pest_control_rewards:ranged_xp_1") {
+            addXPForSkill(this, Skill.Ranged, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:ranged_xp_10") {
+            addXPForSkill(this, Skill.Ranged, RATE_TEN)
+        }
+        interfaceOption("Exchange-100", "pest_control_rewards:ranged_xp_100") {
+            addXPForSkill(this, Skill.Ranged, RATE_HUNDRED)
+        }
+
+        // XP rewards for Magic
+        interfaceOption("Exchange-1", "pest_control_rewards:magic_xp_1") {
+            addXPForSkill(this, Skill.Magic, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:magic_xp_10") {
+            addXPForSkill(this, Skill.Magic, RATE_TEN)
+        }
+        interfaceOption("Exchange-100", "pest_control_rewards:magic_xp_100") {
+            addXPForSkill(this, Skill.Magic, RATE_HUNDRED)
+        }
+
+        // XP rewards for Prayer
+        interfaceOption("Exchange-1", "pest_control_rewards:prayer_xp_1") {
+            addXPForSkill(this, Skill.Prayer, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:prayer_xp_10") {
+            addXPForSkill(this, Skill.Prayer, RATE_TEN)
+        }
+        interfaceOption("Exchange-100", "pest_control_rewards:prayer_xp_100") {
+            addXPForSkill(this, Skill.Prayer, RATE_HUNDRED)
+        }
+
         // Void equipment buttons
-        for ((index, componentId) in VOID_BASE_COMPONENTS.withIndex()) {
-            val component = getComponentName(componentId)
-            if (component != null) {
-                interfaceOption(id = "pest_control_rewards:$component", option = "Exchange") {
-                    addVoidItem(this, index)
-                }
-            }
+        interfaceOption("Exchange", "pest_control_rewards:void_top") {
+            addVoidItem(this, 0)
+        }
+        interfaceOption("Exchange", "pest_control_rewards:void_robe") {
+            addVoidItem(this, 1)
+        }
+        interfaceOption("Exchange", "pest_control_rewards:void_gloves") {
+            addVoidItem(this, 2)
+        }
+        interfaceOption("Exchange", "pest_control_rewards:void_mace") {
+            addVoidItem(this, 3)
+        }
+        interfaceOption("Exchange", "pest_control_rewards:void_ranger_helm") {
+            addVoidItem(this, 4)
+        }
+        interfaceOption("Exchange", "pest_control_rewards:void_mage_helm") {
+            addVoidItem(this, 5)
+        }
+        interfaceOption("Exchange", "pest_control_rewards:void_ranger_top") {
+            addVoidItem(this, 6)
+        }
+        interfaceOption("Exchange", "pest_control_rewards:void_mage_top") {
+            addVoidItem(this, 7)
+        }
+        interfaceOption("Exchange", "pest_control_rewards:void_seal") {
+            addVoidItem(this, 8)
         }
 
         // Charm buttons
-        for ((index, componentId) in CHARM_BASE_COMPONENTS.withIndex()) {
-            val component = getComponentName(componentId)
-            if (component != null) {
-                interfaceOption(id = "pest_control_rewards:$component", option = "Exchange") {
-                    addCharm(this, index, RATE_ONE)
-                }
-            }
+        interfaceOption("Exchange-1", "pest_control_rewards:gold_charm") {
+            addCharm(this, 0, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:gold_charm") {
+            addCharm(this, 0, RATE_TEN)
+        }
+        interfaceOption("Exchange-All", "pest_control_rewards:gold_charm") {
+            addCharm(this, 0, RATE_HUNDRED)
+        }
+        interfaceOption("Exchange-1", "pest_control_rewards:green_charm") {
+            addCharm(this, 1, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:green_charm") {
+            addCharm(this, 1, RATE_TEN)
+        }
+        interfaceOption("Exchange-All", "pest_control_rewards:green_charm") {
+            addCharm(this, 1, RATE_HUNDRED)
+        }
+        interfaceOption("Exchange-1", "pest_control_rewards:crimson_charm") {
+            addCharm(this, 2, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:crimson_charm") {
+            addCharm(this, 2, RATE_TEN)
+        }
+        interfaceOption("Exchange-All", "pest_control_rewards:crimson_charm") {
+            addCharm(this, 2, RATE_HUNDRED)
+        }
+        interfaceOption("Exchange-1", "pest_control_rewards:blue_charm") {
+            addCharm(this, 3, RATE_ONE)
+        }
+        interfaceOption("Exchange-10", "pest_control_rewards:blue_charm") {
+            addCharm(this, 3, RATE_TEN)
+        }
+        interfaceOption("Exchange-All", "pest_control_rewards:blue_charm") {
+            addCharm(this, 3, RATE_HUNDRED)
         }
 
         // Resource packs
-        interfaceOption(id = "pest_control_rewards:herblore_pack", option = "Exchange") {
-            addHerblorePack(this)
+        interfaceOption("Exchange", "pest_control_rewards:herblore_pack") {
+            addResourcePack(this, cfg.resourcePacks.herblorePack)
         }
-        interfaceOption(id = "pest_control_rewards:mineral_pack", option = "Exchange") {
-            addMineralPack(this)
+        interfaceOption("Exchange", "pest_control_rewards:mineral_pack") {
+            addResourcePack(this, cfg.resourcePacks.mineralPack)
         }
-        interfaceOption(id = "pest_control_rewards:seed_pack", option = "Exchange") {
-            addSeedPack(this)
-        }
-    }
-
-    private fun getComponentName(componentId: Int): String? {
-        return when (componentId) {
-            15 -> "void_top"
-            196 -> "void_robe"
-            208 -> "void_gloves"
-            220 -> "void_mace"
-            232 -> "void_ranger_helm"
-            244 -> "void_mage_helm"
-            256 -> "void_ranger_top"
-            268 -> "void_mage_top"
-            280 -> "void_seal"
-            324 -> "gold_charm"
-            339 -> "green_charm"
-            354 -> "crimson_charm"
-            369 -> "blue_charm"
-            291 -> "herblore_pack"
-            302 -> "mineral_pack"
-            313 -> "seed_pack"
-            else -> null
+        interfaceOption("Exchange", "pest_control_rewards:seed_pack") {
+            addResourcePack(this, cfg.resourcePacks.seedPack)
         }
     }
 
-    fun openExchangeShop(player: Player) {
-        player.interfaces.open("pest_control_rewards")
-        refreshPoints(player)
-        player.message("XP rewards are x10 the amount displayed.", ChatType.Game)
-    }
-
-    private fun refreshPoints(player: Player) {
-        val points = player["pest_control_points", 0]
-        player.interfaces.sendText("pest_control_rewards", "commendations", "Commendations: $points")
-    }
 
     private fun exchangeCommendation(player: Player, price: Int): Boolean {
-        val newPoints = player["pest_control_points", 0] - price
+        val currentPoints = player["pest_control_points", 0]
+        val newPoints = currentPoints - price
+        log.debug { "Exchange attempt: current=$currentPoints, price=$price, new=$newPoints" }
         if (newPoints < 0) {
             player.message("You don't have enough Commendations remaining to complete this exchange.", ChatType.Game)
             return false
@@ -162,7 +353,7 @@ class CommendationExchange : Script, InterfaceApi {
         }
         for (i in 0 until rate) {
             if (!exchangeCommendation(player, 1)) {
-                break
+                return
             }
         }
         val experience = calculateExperience(player, skill) * rate
@@ -171,6 +362,7 @@ class CommendationExchange : Script, InterfaceApi {
     }
 
     private fun addVoidItem(player: Player, index: Int) {
+        val cfg = config.voidEquipment
         // Check skill requirements: 42 Attack, Strength, Defence, Constitution, Range, Magic, 22 Prayer
         if (player.levels.get(Skill.Attack) < 42 ||
             player.levels.get(Skill.Strength) < 42 ||
@@ -182,18 +374,18 @@ class CommendationExchange : Script, InterfaceApi {
             player.message("You need an attack, strength, defence, constitution, range, and magic level of 42, and a prayer level of 22 in order to purchase void equipment.", ChatType.Game)
             return
         }
-        val cost = VOID_COSTS[index]
+        val cost = cfg.costs[index]
         if (!exchangeCommendation(player, cost)) {
             return
         }
-        val voidItem = VOID_ITEMS[index]
+        val voidItem = cfg.items[index]
         player.inventory.transaction {
-            add(voidItem)
+            add(voidItem, 1)
         }
         when (player.inventory.transaction.error) {
             is TransactionError.Full -> player.message("You don't have enough inventory space.", ChatType.Game)
             TransactionError.None -> {
-                val itemName = ItemDefinitions.get(voidItem).name.lowercase()
+                val itemName = voidItem.lowercase()
                 player.message("You exchange $cost commendation points for a $itemName.", ChatType.Game)
                 AuditLog.event(player, "bought", Item(voidItem), "pest_control_exchange", cost)
             }
@@ -202,6 +394,7 @@ class CommendationExchange : Script, InterfaceApi {
     }
 
     private fun addCharm(player: Player, index: Int, rate: Int) {
+        val cfg = config
         val actualRate = if (rate == 100) player.inventory.spaces else rate
         var exchanged = 0
         for (i in 0 until actualRate) {
@@ -213,7 +406,7 @@ class CommendationExchange : Script, InterfaceApi {
         if (exchanged == 0) {
             return
         }
-        val charmItem = CHARM_ITEMS[index]
+        val charmItem = cfg.charms.items[index]
         player.inventory.transaction {
             add(charmItem, exchanged)
         }
@@ -226,72 +419,44 @@ class CommendationExchange : Script, InterfaceApi {
         }
     }
 
-    private fun addHerblorePack(player: Player) {
-        if (player.levels.get(Skill.Herblore) < 25) {
-            player.message("You need a herblore level of 25 in order to purchase a herblore pack.", ChatType.Game)
+    private fun addResourcePack(player: Player, packConfig: ResourcePackConfig) {
+        val skill = Skill.valueOf(packConfig.skill.replaceFirstChar { it.uppercase() })
+        if (player.levels.get(skill) < packConfig.level) {
+            player.message("You need a ${packConfig.skill} level of ${packConfig.level} in order to purchase a ${packConfig.skill} pack.", ChatType.Game)
             return
         }
-        if (!exchangeCommendation(player, 30)) {
+        if (!exchangeCommendation(player, packConfig.cost)) {
             return
         }
-        // Add random herbs (simplified - in real implementation would use HerbCleaning.Herbs)
+        // Add items based on pack type (simplified implementation)
         val freeSlots = player.inventory.spaces
-        player.inventory.transaction {
-            add("clean_guam", min(5, freeSlots)) // Guam leaf
-            add("clean_irit", min(4, freeSlots)) // Irit leaf
-            add("clean_avantoe", min(3, freeSlots)) // Avantoe
-            add("clean_kwuarm", min(2, freeSlots)) // Kwuarm
-        }
-        when (player.inventory.transaction.error) {
-            is TransactionError.Full -> player.message("You don't have enough inventory space.", ChatType.Game)
-            TransactionError.None -> {
-                player.message("You exchange 30 commendation points for a herblore pack.", ChatType.Game)
+        when (packConfig.skill) {
+            "herblore" -> {
+                player.inventory.transaction {
+                    add("clean_guam", min(5, freeSlots))
+                    add("clean_irit", min(4, freeSlots))
+                    add("clean_avantoe", min(3, freeSlots))
+                    add("clean_kwuarm", min(2, freeSlots))
+                }
             }
-            else -> {}
-        }
-    }
-
-    private fun addMineralPack(player: Player) {
-        if (player.levels.get(Skill.Mining) < 25) {
-            player.message("You need a mining level of 25 in order to purchase a mineral pack.", ChatType.Game)
-            return
-        }
-        if (!exchangeCommendation(player, 15)) {
-            return
-        }
-        val freeSlots = player.inventory.spaces
-        player.inventory.transaction {
-            add("copper_ore", min(20, freeSlots)) // Copper ore
-            add("coal", min(30, freeSlots)) // Coal
-        }
-        when (player.inventory.transaction.error) {
-            is TransactionError.Full -> player.message("You don't have enough inventory space.", ChatType.Game)
-            TransactionError.None -> {
-                player.message("You exchange 15 commendation points for a mineral pack.", ChatType.Game)
+            "mining" -> {
+                player.inventory.transaction {
+                    add("copper_ore", min(20, freeSlots))
+                    add("coal", min(30, freeSlots))
+                }
             }
-            else -> {}
-        }
-    }
-
-    private fun addSeedPack(player: Player) {
-        if (player.levels.get(Skill.Farming) < 25) {
-            player.message("You need a farming level of 25 in order to purchase a seed pack.", ChatType.Game)
-            return
-        }
-        if (!exchangeCommendation(player, 15)) {
-            return
-        }
-        val freeSlots = player.inventory.spaces
-        // Add random seeds (simplified)
-        player.inventory.transaction {
-            add("potato_seed", min(5, freeSlots)) // Potato seed
-            add("onion_seed", min(3, freeSlots)) // Onion seed
-            add("cabbage_seed", min(2, freeSlots)) // Cabbage seed
+            "farming" -> {
+                player.inventory.transaction {
+                    add("potato_seed", min(5, freeSlots))
+                    add("onion_seed", min(3, freeSlots))
+                    add("cabbage_seed", min(2, freeSlots))
+                }
+            }
         }
         when (player.inventory.transaction.error) {
             is TransactionError.Full -> player.message("You don't have enough inventory space.", ChatType.Game)
             TransactionError.None -> {
-                player.message("You exchange 15 commendation points for a seed pack.", ChatType.Game)
+                player.message("You exchange ${packConfig.cost} commendation points for a ${packConfig.skill} pack.", ChatType.Game)
             }
             else -> {}
         }
