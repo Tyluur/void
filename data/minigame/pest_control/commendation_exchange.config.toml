@@ -1,0 +1,23 @@
+[void_equipment]
+items = ["void_melee_helm", "void_ranger_helm", "void_mage_helm", "void_top", "void_robe", "void_gloves", "void_mace", "void_deflector", "void_seal"]
+costs = [200, 200, 200, 250, 250, 150, 250, 150, 10]
+
+[charms]
+items = ["gold_charm", "green_charm", "crimson_charm", "blue_charm"]
+
+[herblore_pack]
+cost = 30
+skill = "herblore"
+level = 25
+
+[mineral_pack]
+cost = 15
+skill = "mining"
+level = 25
+
+[seed_pack]
+cost = 15
+skill = "farming"
+level = 25
+
+
