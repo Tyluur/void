@@ -56,6 +56,10 @@ class CommendationExchange : Script, InterfaceApi {
         private const val RATE_TEN = 10
         private const val RATE_HUNDRED = 100
         private const val CHARM_COST = 2
+        // Charm purchase amounts per 2010 wiki: 1, 14, or 28 (costing 2, 28, and 56 points)
+        private const val CHARM_AMOUNT_SINGLE = 1
+        private const val CHARM_AMOUNT_HALF_INV = 14
+        private const val CHARM_AMOUNT_FULL_INV = 28
         
         fun loadConfig() {
             var voidEquipment: VoidEquipmentConfig? = null
@@ -320,42 +324,42 @@ class CommendationExchange : Script, InterfaceApi {
             addVoidItem(this, 8)
         }
 
-        // Charm buttons
+        // Charm buttons - wiki amounts: 1, 14, or 28 (costing 2, 28, and 56 points respectively)
         interfaceOption("Exchange-1", "pest_control_rewards:gold_charm") {
-            addCharm(this, 0, RATE_ONE)
+            addCharm(this, 0, CHARM_AMOUNT_SINGLE)
         }
         interfaceOption("Exchange-10", "pest_control_rewards:gold_charm_10") {
-            addCharm(this, 0, RATE_TEN)
+            addCharm(this, 0, CHARM_AMOUNT_HALF_INV)
         }
         interfaceOption("Exchange-All", "pest_control_rewards:gold_charm_all") {
-            addCharm(this, 0, RATE_HUNDRED)
+            addCharm(this, 0, CHARM_AMOUNT_FULL_INV)
         }
         interfaceOption("Exchange-1", "pest_control_rewards:green_charm") {
-            addCharm(this, 1, RATE_ONE)
+            addCharm(this, 1, CHARM_AMOUNT_SINGLE)
         }
         interfaceOption("Exchange-10", "pest_control_rewards:green_charm_10") {
-            addCharm(this, 1, RATE_TEN)
+            addCharm(this, 1, CHARM_AMOUNT_HALF_INV)
         }
         interfaceOption("Exchange-All", "pest_control_rewards:green_charm_all") {
-            addCharm(this, 1, RATE_HUNDRED)
+            addCharm(this, 1, CHARM_AMOUNT_FULL_INV)
         }
         interfaceOption("Exchange-1", "pest_control_rewards:crimson_charm") {
-            addCharm(this, 2, RATE_ONE)
+            addCharm(this, 2, CHARM_AMOUNT_SINGLE)
         }
         interfaceOption("Exchange-10", "pest_control_rewards:crimson_charm_10") {
-            addCharm(this, 2, RATE_TEN)
+            addCharm(this, 2, CHARM_AMOUNT_HALF_INV)
         }
         interfaceOption("Exchange-All", "pest_control_rewards:crimson_charm_all") {
-            addCharm(this, 2, RATE_HUNDRED)
+            addCharm(this, 2, CHARM_AMOUNT_FULL_INV)
         }
         interfaceOption("Exchange-1", "pest_control_rewards:blue_charm") {
-            addCharm(this, 3, RATE_ONE)
+            addCharm(this, 3, CHARM_AMOUNT_SINGLE)
         }
         interfaceOption("Exchange-10", "pest_control_rewards:blue_charm_10") {
-            addCharm(this, 3, RATE_TEN)
+            addCharm(this, 3, CHARM_AMOUNT_HALF_INV)
         }
         interfaceOption("Exchange-All", "pest_control_rewards:blue_charm_all") {
-            addCharm(this, 3, RATE_HUNDRED)
+            addCharm(this, 3, CHARM_AMOUNT_FULL_INV)
         }
 
         // Resource packs
@@ -394,7 +398,14 @@ class CommendationExchange : Script, InterfaceApi {
                 return
             }
         }
-        val experience = calculateExperience(player, skill) * rate
+        val baseExperience = calculateExperience(player, skill) * rate
+        // Bulk exchange bonus: 10% for 100 points, 1% for 10 points (2010 wiki)
+        val bonus = when (rate) {
+            RATE_HUNDRED -> 1.10
+            RATE_TEN -> 1.01
+            else -> 1.0
+        }
+        val experience = baseExperience * bonus
         player.experience.add(skill, experience)
         player.message("You gain ${experience.toInt()} experience in ${skill.name}.", ChatType.Game)
     }
@@ -411,6 +422,14 @@ class CommendationExchange : Script, InterfaceApi {
             player.levels.get(Skill.Prayer) < 22) {
             player.message("You need an attack, strength, defence, constitution, range, and magic level of 42, and a prayer level of 22 in order to purchase void equipment.", ChatType.Game)
             return
+        }
+        // Void Knight Deflector requires Conquest ranking of 1250+ (2010 wiki)
+        if (index == 7) {
+            val conquestRanking = player["conquest_ranking", 0]
+            if (conquestRanking < 1250) {
+                player.message("You need a Conquest ranking of at least 1250 to purchase the Void Knight deflector.", ChatType.Game)
+                return
+            }
         }
         if (player.inventory.spaces <= 0) {
             player.message("You don't have enough inventory space.", ChatType.Game)
@@ -438,8 +457,8 @@ class CommendationExchange : Script, InterfaceApi {
     private fun addCharm(player: Player, index: Int, rate: Int) {
         val cfg = config
         val freeSlots = player.inventory.spaces
-        val requestedRate = if (rate == RATE_HUNDRED) freeSlots else rate
-        val actualRate = min(requestedRate, freeSlots)
+        // Charm amounts are fixed at 1/14/28 per 2010 wiki, capped by inventory space
+        val actualRate = min(rate, freeSlots)
         if (actualRate <= 0) {
             player.message("You don't have enough inventory space.", ChatType.Game)
             return
@@ -488,19 +507,24 @@ class CommendationExchange : Script, InterfaceApi {
         }
         when (packConfig.skill) {
             "herblore" -> {
-                queue("clean_guam", 5)
-                queue("clean_irit", 4)
-                queue("clean_avantoe", 3)
-                queue("clean_kwuarm", 2)
+                // 2010 wiki: grimy Harralander, Ranarr, Toadflax, Irit, Avantoe, Kwuarm (randomized)
+                queue("grimy_harralander", 2)
+                queue("grimy_ranarr", 3)
+                queue("grimy_toadflax", 1)
+                queue("grimy_irit", 3)
+                queue("grimy_avantoe", 4)
+                queue("grimy_kwuarm", 2)
             }
             "mining" -> {
-                queue("copper_ore", 20)
-                queue("coal", 30)
+                // 2010 wiki: 25 Coal, 18 Iron ore
+                queue("coal", 25)
+                queue("iron_ore", 18)
             }
             "farming" -> {
-                queue("potato_seed", 5)
-                queue("onion_seed", 3)
-                queue("cabbage_seed", 2)
+                // 2010 wiki: 3 sweetcorn seeds, 6 tomato seeds, 2 limpwurt seeds
+                queue("sweetcorn_seed", 3)
+                queue("tomato_seed", 6)
+                queue("limpwurt_seed", 2)
             }
         }
         if (additions.isEmpty()) {
@@ -531,6 +555,7 @@ class CommendationExchange : Script, InterfaceApi {
             Skill.Prayer -> 18
             else -> 35
         }
-        return ceil(((level + 25) * (level - 24)) / 606.0 * constant) + constant
+        // Wiki formula: Ceiling((l+25)*(l-24)/606) * N
+        return ceil((level + 25).toDouble() * (level - 24).toDouble() / 606.0) * constant
     }
 }

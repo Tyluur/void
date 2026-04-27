@@ -152,14 +152,14 @@ barricades = [
 ]
 
 [timers]
-lobby_timer_seconds = 30
+lobby_timer_seconds = 300
 game_timer_seconds = 1200
 pest_spawn_interval_seconds = 10
 first_shield_drop_seconds = 30
 subsequent_shield_drop_interval_seconds = 30
 
 [limits]
-min_players_to_start = 1
+min_players_to_start = 5
 knight_health = 250
 max_pests_per_portal = 15
 max_pests_near_knight = 4

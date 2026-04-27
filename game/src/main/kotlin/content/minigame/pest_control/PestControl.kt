@@ -6,6 +6,7 @@ import content.entity.combat.dead
 import content.entity.combat.hit.hit
 import content.entity.combat.target
 import content.entity.combat.underAttack
+import content.entity.effect.toxin.poison
 import content.minigame.pest_control.PestControl.Companion.FORTIFICATION_PROGRESSION
 import content.minigame.pest_control.PestControl.Companion.INVALID_OBJECT_IDS
 import content.minigame.pest_control.PestControl.Companion.RAVAGER_TARGET_DISTANCE
@@ -37,6 +38,8 @@ import world.gregs.voidps.engine.entity.character.player.skill.Skill
 import world.gregs.voidps.engine.entity.item.Item
 import world.gregs.voidps.engine.entity.obj.GameObject
 import world.gregs.voidps.engine.entity.obj.GameObjects
+import world.gregs.voidps.engine.inv.add
+import world.gregs.voidps.engine.inv.inventory
 import world.gregs.voidps.engine.map.collision.Collisions
 import world.gregs.voidps.engine.map.collision.check
 import world.gregs.voidps.engine.timedLoad
@@ -151,6 +154,12 @@ class PestControl : Script {
         // fortification reaches its destroyed state - the cache models for the destroyed ids
         // (14230-14232 barricades, 14245-14248 gates) only render properly at this shape.
         private const val DESTROYED_OBJECT_SHAPE = 22
+
+        // Reverse of FORTIFICATION_PROGRESSION: maps damaged → previous state for repair
+        // (2010 wiki: "Repairing a barricade or gate acts as 50 points of damage on a monster")
+        private val REPAIR_PROGRESSION: Map<Int, Int> by lazy {
+            FORTIFICATION_PROGRESSION.entries.associate { (k, v) -> v to k }
+        }
 
         // Ravager combat tuning (matches 2009scape PCRavagerNPC)
         private const val RAVAGER_ATTACK_RANGE = 1
@@ -332,12 +341,13 @@ class PestControl : Script {
                 val spinnersToExplode =
                     gameData.pests.filter { it.id.contains("spinner") && (it["portal_index"] as? Int) == portalIndex }
                 for (spinner in spinnersToExplode) {
-                    // Damage nearby players
+                    // Damage nearby players (2010 wiki: 50 LP instant + poison starting at 18 LP)
                     for (player in gameData.players) {
-                        if (spinner.tile.distanceTo(player.tile) <= 1) {
-                            // Apply poison damage to nearby players
-                            hit(player, offensiveType = "poison", damage = 5)
-                            // Apply poison effect (if poison system exists)
+                        if (spinner.tile.distanceTo(player.tile) <= 2) {
+                            // 50 LP instant damage
+                            player.hit(spinner, damage = 50, offensiveType = "damage", weapon = Item.EMPTY)
+                            // Poison starting at 18 LP
+                            spinner.poison(player, 18)
                         }
                     }
                     // Remove spinner
@@ -703,6 +713,22 @@ class PestControl : Script {
             handleExitLander(this)
         }
 
+        // Barricade/gate repair (2010 wiki: repair = 50 damage credit toward zeal)
+        objectOperate("Repair", "*") {
+            val obj = it.target
+            val objId = obj.intId
+            if (objId !in FORTIFICATION_IDS) return@objectOperate
+            val repairedId = REPAIR_PROGRESSION[objId] ?: return@objectOperate
+
+            val gameId = playerToGameId[this] ?: run {
+                message("You can only repair during a Pest Control game.", ChatType.Game)
+                return@objectOperate
+            }
+            val gameData = activeGames[gameId] ?: return@objectOperate
+
+            repairFortification(this, obj, repairedId, gameData)
+        }
+
         // Squire talk-to for each difficulty
         npcOperate("Talk-to", "squire_novice_pest_control") {
             this.enterLander("novice")
@@ -787,28 +813,23 @@ class PestControl : Script {
                 if (gameId != null) {
                     val gameData = activeGames[gameId]
                     if (gameData != null) {
-                        // Teleport player to entrance point instead of removing them
-                        val diffConfig = difficultyConfig(difficultyName)
-                        if (diffConfig != null) {
-                            val entranceTile =
-                                Tile(diffConfig.exitTileX, diffConfig.exitTileY, diffConfig.exitTileLevel)
-                            tele(entranceTile)
-                            message("Oh dear, you died! You have been returned to the entrance.", ChatType.Game)
-                        }
-                        // Reset NPC collision blocking
-                        this.blockMove = 0
-                        // Remove player from game data
-                        gameData.players.remove(this)
-                        // Remove player-to-game mapping
-                        playerToGameId.remove(this)
-                        // Keep player in the game, don't remove them
-                        // Don't end the game if players die - only end if knight dies or time runs out
+                        // Safe activity: respawn on the island with full stats (2010 wiki)
+                        // Teleport to entrance within the instance
+                        val playerOffset = this.instanceOffset()
+                        tele(entrance.add(playerOffset))
+                        // Restore HP and prayer (respawn with full stats)
+                        levels.restore(Skill.Constitution, levels.getMax(Skill.Constitution))
+                        levels.restore(Skill.Prayer, levels.getMax(Skill.Prayer))
+                        message("Oh dear, you have died! But you quickly " +
+                                "recover and find yourself back at the lander.", ChatType.Game)
+                        // Re-enable NPC collision for brawler blocking
+                        this.blockMove = CollisionFlag.BLOCK_NPCS
+                        // Re-open game overlay
+                        this.interfaces.open("pest_control_playing")
+                        updateGameInterface(this, gameData)
+                        // Player stays in the game — do NOT remove from gameData or playerToGameId
                     }
                 }
-                // Don't remove player from active games - they can re-enter
-                // Just clear their game state so they can re-enter
-                this.interfaces.close("pest_control_playing")
-                this.clear("pest_control_game_active")
             }
         }
     }
@@ -841,6 +862,16 @@ class PestControl : Script {
             return
         }
 
+        // 500-point warnings (2010 wiki)
+        val currentPoints = this["pest_control_points", 0]
+        val rewardPoints = diffConfig.rewardPoints
+        if (currentPoints >= 500) {
+            message("You already have 500 commendation points. You should spend them before playing again.", ChatType.Game)
+        } else if (currentPoints + rewardPoints > 500) {
+            val wasted = (currentPoints + rewardPoints) - 500
+            message("Warning: You have $currentPoints points. Winning would only award ${rewardPoints - wasted} of $rewardPoints points.", ChatType.Game)
+        }
+
         // Add to centralized lobby
         val lobby = lobbies[difficultyName] ?: return
         synchronized(lobby) {
@@ -848,6 +879,12 @@ class PestControl : Script {
                 lobbyTimers[difficultyName] = if (DEBUG_MODE) 1 else lobbyTimerSeconds
             }
             lobby.add(this)
+
+            // Auto-start when lander fills with 25 players (2010 wiki)
+            if (lobby.size >= 25) {
+                startGame(difficultyName)
+                return
+            }
         }
 
         // Teleport to lander
@@ -1299,6 +1336,47 @@ class PestControl : Script {
             gameData.barricades[liveTarget.tile] = replacement
             pest[RAVAGER_FORTIFICATION_TARGET_KEY] = replacement.tile
         }
+    }
+
+    /**
+     * Repairs a damaged barricade or gate, replacing it with its previous (less damaged) state.
+     * Credits the player with 50 damage toward the 500 zeal requirement.
+     * (2010 wiki: "Repairing a barricade or gate acts as 50 points of damage on a monster")
+     *
+     * @param player The player performing the repair
+     * @param target The damaged fortification object
+     * @param repairedId The cache id to replace it with (previous damage state)
+     * @param gameData The active game state
+     */
+    private fun repairFortification(
+        player: Player,
+        target: GameObject,
+        repairedId: Int,
+        gameData: PestGameData
+    ) {
+        val replacementName = ObjectDefinitions.getValue(repairedId).stringId
+        if (replacementName.isEmpty()) {
+            log.warn { "REPAIR: cache id $repairedId has no toml stringId; aborting" }
+            return
+        }
+
+        // Remove all fortification objects at this tile (same sweep pattern as attackFortification)
+        for (fort in fortificationsAtTile(target.tile)) {
+            GameObjects.remove(fort)
+        }
+        for (reAdded in fortificationsAtTile(target.tile)) {
+            GameObjects.remove(reAdded)
+        }
+
+        // Place repaired object (use original shape/rotation since we're restoring)
+        val replacement = GameObjects.add(replacementName, target.tile, target.shape, target.rotation)
+        gameData.barricades[target.tile] = replacement
+
+        // Credit 50 damage toward zeal requirement
+        gameData.playerDamage[player] = (gameData.playerDamage[player] ?: 0) + 50
+        val type = if (target.intId < GATE_BREAK_ID) "barricade" else "gate"
+        player.message("You repair the $type.", ChatType.Game)
+        log.debug { "REPAIR: ${player.name} repaired $type at ${target.tile} (${target.intId} -> $repairedId), +50 zeal" }
     }
 
     /**
@@ -1910,9 +1988,11 @@ class PestControl : Script {
                         }
                     }
 
-                    // Brawlers never attack the Void Knight (2011 wiki: "Brawlers will never attack the Void knight")
+                    // Brawlers and splatters never attack the Void Knight
+                    // (2010 wiki: "Brawlers will never attack the Void knight", "Splatters will never attack the Void knight")
                     val isBrawler = pestId.contains("brawler")
-                    if (isBrawler && target is NPC && target == knight) {
+                    val isSplatter = pestId.contains("splatter")
+                    if ((isBrawler || isSplatter) && target is NPC && target == knight) {
                         log.debug { "PEST TARGETING: Brawler ${pest.id} skipping knight (brawlers never attack knight), targeting player instead" }
                         val playerTarget = gameData.players.firstOrNull { player ->
                             !player.dead && player.tile.distanceTo(pest.tile) <= 10
@@ -1980,17 +2060,17 @@ class PestControl : Script {
                 updateGameInterface(p, gameData)
             }
 
-            // Check win/lose conditions
-            if (timer <= 0) {
-                // Time's up - lose
-                endGame(gameData, false)
-                gamesToRemove.add(gameId)
-            } else if (gameData.knightHealth <= 0) {
+            // Check win/lose conditions (knight death checked first)
+            if (gameData.knightHealth <= 0) {
                 // Knight died - lose
                 endGame(gameData, false)
                 gamesToRemove.add(gameId)
             } else if (gameData.portalsDestroyed >= 4) {
                 // All portals destroyed - win
+                endGame(gameData, true)
+                gamesToRemove.add(gameId)
+            } else if (timer <= 0) {
+                // Time's up with knight alive - WIN (2010 wiki: "Keep the Void Knight alive for 20 minutes")
                 endGame(gameData, true)
                 gamesToRemove.add(gameId)
             }
@@ -2242,13 +2322,31 @@ class PestControl : Script {
             // Remove player-to-game mapping
             playerToGameId.remove(player)
 
+            // Restore all stats at end of game (2010 wiki: HP, Prayer, spec, energy, all stats)
+            for (skill in Skill.all) {
+                val offset = player.levels.getOffset(skill)
+                if (offset < 0) {
+                    player.levels.restore(skill, -offset)
+                } else if (offset > 0) {
+                    player.levels.drain(skill, offset)
+                }
+            }
+            player.levels.restore(Skill.Constitution, player.levels.getMax(Skill.Constitution))
+            player.levels.restore(Skill.Prayer, player.levels.getMax(Skill.Prayer))
+            player["energy"] = 10000 // Run energy fully restored (10000 = 100%)
+            player["special_attack_energy"] = 1000 // Special attack bar fully restored (MAX_SPECIAL_ATTACK = 1000)
+
             if (won) {
                 val currentPoints = player["pest_control_points", 0]
                 val playerDamage = gameData.playerDamage[player] ?: 0
-                
+
+                // Coin reward: combat level * 10 (2010 wiki)
+                val coinReward = player.combatLevel * 10
+                player.inventory.add("coins", coinReward)
+
                 // Check damage requirement (500 damage minimum)
                 if (playerDamage < 500) {
-                    player.message("You failed to deal at least 500 damage. No commendation points awarded.", ChatType.Game)
+                    player.message("The knights have noticed your lack of zeal in the battle and have not rewarded you with any points.", ChatType.Game)
                 } else {
                     // Check points cap (500 maximum)
                     if (currentPoints + points > 500) {
