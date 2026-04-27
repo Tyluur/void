@@ -210,10 +210,13 @@ class PestControl : Script {
     init {
         // Handle void knight damage - allow damage from pests
         npcCombatDamage("void_knight") { damage ->
-            log.info { "VOID KNIGHT DAMAGE HANDLER: source=${damage.source}, type=${damage.type}, damage=${damage.damage}" }
+            // damage=-1 in RS means miss/splash — treat as 0
+            val actualDamage = maxOf(0, damage.damage)
+            log.info { "VOID KNIGHT DAMAGE HANDLER: source=${damage.source}, type=${damage.type}, damage=${damage.damage} (actual=$actualDamage)" }
             log.info { "VOID KNIGHT DAMAGE HANDLER: Before damage - constitution=${this.levels.get(Skill.Constitution)}" }
-            // Apply damage directly to the void knight
-            this.levels.set(Skill.Constitution, this.levels.get(Skill.Constitution) - damage.damage)
+            if (actualDamage > 0) {
+                this.levels.set(Skill.Constitution, this.levels.get(Skill.Constitution) - actualDamage)
+            }
             log.info { "VOID KNIGHT DAMAGE HANDLER: After damage - constitution=${this.levels.get(Skill.Constitution)}" }
         }
 
@@ -977,7 +980,8 @@ class PestControl : Script {
                 lobbyTimers[difficultyName] = timer - 1
 
                 if (timer == 0) {
-                    if (lobby.size >= minPlayersToStart) {
+                    val requiredPlayers = if (DEBUG_MODE) 1 else minPlayersToStart
+                    if (lobby.size >= requiredPlayers) {
                         startGame(difficultyName)
                     } else {
                         lobbyTimers[difficultyName] = lobbyTimerSeconds
@@ -1981,7 +1985,7 @@ class PestControl : Script {
                         }), pest.mode=${pest.mode}, pest.underAttack=${pest.underAttack}"
                     }
 
-                    val target = if (targetKnight) knight else {
+                    val initialTarget = if (targetKnight) knight else {
                         // Find and attack nearby players
                         gameData.players.firstOrNull { player ->
                             !player.dead && player.tile.distanceTo(pest.tile) <= 10
@@ -1992,18 +1996,14 @@ class PestControl : Script {
                     // (2010 wiki: "Brawlers will never attack the Void knight", "Splatters will never attack the Void knight")
                     val isBrawler = pestId.contains("brawler")
                     val isSplatter = pestId.contains("splatter")
-                    if ((isBrawler || isSplatter) && target is NPC && target == knight) {
-                        log.debug { "PEST TARGETING: Brawler ${pest.id} skipping knight (brawlers never attack knight), targeting player instead" }
-                        val playerTarget = gameData.players.firstOrNull { player ->
+                    val target = if ((isBrawler || isSplatter) && initialTarget is NPC && initialTarget == knight) {
+                        val pestType = if (isBrawler) "Brawler" else "Splatter"
+                        log.debug { "PEST TARGETING: $pestType ${pest.id} skipping knight, targeting player instead" }
+                        gameData.players.firstOrNull { player ->
                             !player.dead && player.tile.distanceTo(pest.tile) <= 10
                         }
-                        if (playerTarget != null) {
-                            playerTarget
-                        } else {
-                            null
-                        }
                     } else {
-                        target
+                        initialTarget
                     }
 
                     if (target != null) {
