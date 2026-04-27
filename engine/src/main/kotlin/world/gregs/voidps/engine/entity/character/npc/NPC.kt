@@ -35,7 +35,19 @@ data class NPC(
     override val blockMove: Int
         get() = if (transformDef["solid", true]) CollisionFlag.BLOCK_PLAYERS or CollisionFlag.BLOCK_NPCS else 0
     override val collisionFlag: Int
-        get() = CollisionFlag.BLOCK_NPCS or if (transformDef["solid", false]) CollisionFlag.FLOOR else 0
+        get() {
+            var flags = 0
+            if (blocksPlayers) {
+                flags = flags or CollisionFlag.BLOCK_NPCS
+            }
+            if (transformDef["solid", false]) {
+                flags = flags or CollisionFlag.FLOOR
+            }
+            return flags
+        }
+
+    val blocksPlayers: Boolean
+        get() = transformDef["blocks_players", false]
 
     val transformId: String
         get() = this["transform_id", id]

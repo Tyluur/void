@@ -795,6 +795,8 @@ class PestControl : Script {
                             tele(entranceTile)
                             message("Oh dear, you died! You have been returned to the entrance.", ChatType.Game)
                         }
+                        // Reset NPC collision blocking
+                        this.blockMove = 0
                         // Remove player from game data
                         gameData.players.remove(this)
                         // Remove player-to-game mapping
@@ -1030,6 +1032,9 @@ class PestControl : Script {
             player["pest_control_difficulty"] = difficultyName
             player["pest_control_game_active"] = true
             player.remove<String>("pest_control_in_lobby")
+
+            // Enable NPC collision for brawler blocking (only brawlers have blocks_players = true)
+            player.blockMove = CollisionFlag.BLOCK_NPCS
 
             // Track player to game ID mapping
             playerToGameId[player] = gameId
@@ -1312,6 +1317,23 @@ class PestControl : Script {
         val knight = gameData.knightNPC
         val inCombat = pest.mode is CombatMovement
 
+        // Random teleportation: 1/15 chance per tick (matching Matrix4 Utils.random(15) == 0)
+        if (random.nextInt(15) == 0) {
+            val target = if (inCombat) {
+                (pest.mode as CombatMovement).target
+            } else {
+                knight
+            }
+            if (target != null) {
+                log.debug { "SHIFTER RANDOM TELEPORT: ${pest.id} random teleport to ${if (target is Player) target.name else "void_knight"}" }
+                val destination = findShifterTeleportDestination(target.tile, gameData)
+                if (destination != null) {
+                    performShifterTeleport(pest, destination)
+                }
+                return true
+            }
+        }
+
         // Retaliation: if under attack by a player, target them and teleport if > 5 tiles away
         if (pest.underAttack) {
             val attackers = pest.attackers.filterIsInstance<Player>()
@@ -1320,7 +1342,7 @@ class PestControl : Script {
                 val distance = pest.tile.distanceTo(attacker.tile)
                 if (distance > SHIFTER_TELEPORT_DISTANCE) {
                     log.debug { "SHIFTER RETALIATION: ${pest.id} under attack by ${attacker.name}, distance=$distance > $SHIFTER_TELEPORT_DISTANCE, teleporting to retaliate" }
-                    val destination = findShifterTeleportDestination(attacker.tile)
+                    val destination = findShifterTeleportDestination(attacker.tile, gameData)
                     if (destination != null) {
                         performShifterTeleport(pest, destination)
                     }
@@ -1341,7 +1363,7 @@ class PestControl : Script {
                 val distance = pest.tile.distanceTo(knight.tile)
                 if (distance > SHIFTER_TELEPORT_DISTANCE) {
                     log.debug { "SHIFTER TELEPORT: ${pest.id} distance=$distance > $SHIFTER_TELEPORT_DISTANCE, teleporting before combat" }
-                    val destination = findShifterTeleportDestination(knight.tile)
+                    val destination = findShifterTeleportDestination(knight.tile, gameData)
                     if (destination != null) {
                         performShifterTeleport(pest, destination)
                     }
@@ -1361,7 +1383,7 @@ class PestControl : Script {
                 val distance = pest.tile.distanceTo(target.tile)
                 if (distance > SHIFTER_TELEPORT_DISTANCE) {
                     log.debug { "SHIFTER TELEPORT: ${pest.id} distance=$distance > $SHIFTER_TELEPORT_DISTANCE, teleporting to ${if (target is Player) target.name else "void_knight"}" }
-                    val destination = findShifterTeleportDestination(target.tile)
+                    val destination = findShifterTeleportDestination(target.tile, gameData)
                     if (destination != null) {
                         performShifterTeleport(pest, destination)
                     }
@@ -1373,14 +1395,14 @@ class PestControl : Script {
     }
 
     /**
-     * Finds a valid teleport destination within 2 tiles of the target.
-     * Shuffles possible locations and returns the first valid floor tile.
+     * Finds a valid teleport destination for a shifter near the target tile.
      * Shifters can teleport through walls (blocked for walking) but must end up on valid floor.
+     * Shifters cannot teleport through brawlers (2011 wiki: "Shifters are unable to teleport through them").
      *
      * Mirrors `PCShifterNPC.getDestination` from 2009scape, which uses `RegionManager.isTeleportPermitted`.
      * Since void engine doesn't have teleport-permitted check, we use FLOOR flag to ensure valid floor.
      */
-    private fun findShifterTeleportDestination(targetTile: Tile): Tile? {
+    private fun findShifterTeleportDestination(targetTile: Tile, gameData: PestGameData): Tile? {
         val locations = mutableListOf<Tile>()
         val radius = SHIFTER_TELEPORT_RADIUS
         for (x in -radius..radius) {
@@ -1390,7 +1412,13 @@ class PestControl : Script {
                     // Check if tile has valid floor (not void/invalid)
                     // This allows teleporting through walls but prevents teleporting to invalid tiles
                     if (!Collisions.check(tile.x, tile.y, tile.level, CollisionFlag.FLOOR)) {
-                        locations.add(tile)
+                        // Check if tile is too close to a brawler (shifters cannot teleport through brawlers)
+                        val nearBrawler = gameData.pests.any { pest ->
+                            pest.index != -1 && !pest.dead && pest.id.contains("brawler") && tile.distanceTo(pest.tile) <= 2
+                        }
+                        if (!nearBrawler) {
+                            locations.add(tile)
+                        }
                     }
                 }
             }
@@ -1400,7 +1428,7 @@ class PestControl : Script {
         if (destination != null) {
             log.debug { "SHIFTER TELEPORT: Selected destination $destination around target $targetTile" }
         } else {
-            log.debug { "SHIFTER TELEPORT: No valid floor tiles found around target $targetTile" }
+            log.debug { "SHIFTER TELEPORT: No valid floor tiles found around target $targetTile (brawlers may be blocking)" }
         }
         return destination
     }
@@ -1408,6 +1436,7 @@ class PestControl : Script {
     /**
      * Performs the shifter teleport animation and movement.
      * Sends GFX 654 at source, teleports, plays animation 3904, sends GFX 654 at destination.
+     * Also teleports nearby ravagers and torchers a short distance (matching wiki description).
      *
      * Mirrors `PCShifterNPC.teleport` from 2009scape.
      */
@@ -1416,6 +1445,10 @@ class PestControl : Script {
         destination: Tile
     ) {
         log.debug { "SHIFTER TELEPORT: ${pest.id} teleporting from ${pest.tile} to $destination" }
+        
+        // Teleport nearby ravagers and torchers a short distance (wiki: "can only teleport others a very short distance")
+        teleportNearbyMonsters(pest, destination)
+        
         // Send GFX at source location
         pest.gfx("shifter_teleport_graphics", delay = 0)
 
@@ -1427,6 +1460,85 @@ class PestControl : Script {
         // Play arrival animation and GFX at destination
         pest.anim("shifter_teleport")
         pest.gfx("shifter_teleport_graphics", delay = 1)
+    }
+
+    /**
+     * Teleports nearby ravagers and torchers a short distance when a shifter teleports.
+     * Wiki states shifters can teleport other monsters a very short distance.
+     *
+     * @param shifter The shifter that is teleporting
+     * @param shifterDestination The destination tile of the shifter
+     */
+    private fun teleportNearbyMonsters(shifter: NPC, shifterDestination: Tile) {
+        val nearbyMonsters = mutableListOf<NPC>()
+        
+        // Find nearby ravagers and torchers within 3 tiles
+        for (pest in NPCs.iterator()) {
+            if (pest.index == -1) continue
+            if (pest == shifter) continue
+            if (pest.tile.level != shifter.tile.level) continue
+            
+            val distance = shifter.tile.distanceTo(pest.tile)
+            if (distance <= 3) {
+                val pestId = pest.id.lowercase()
+                if (pestId.contains("ravager") || pestId.contains("torcher")) {
+                    nearbyMonsters.add(pest)
+                }
+            }
+        }
+        
+        // Teleport nearby monsters to a random tile within 1-2 tiles of shifter's destination
+        for (monster in nearbyMonsters) {
+            val offsetX = (-1..1).random()
+            val offsetY = (-1..1).random()
+            val monsterDestination = Tile(shifterDestination.x + offsetX, shifterDestination.y + offsetY, shifterDestination.level)
+            
+            // Check if destination is valid (floor check)
+            if (!Collisions.check(monsterDestination.x, monsterDestination.y, monsterDestination.level, CollisionFlag.FLOOR)) {
+                log.debug { "SHIFTER TELEPORT: Teleporting nearby ${monster.id} from ${monster.tile} to $monsterDestination" }
+                monster.tele(monsterDestination, clearMode = false)
+                monster.gfx("shifter_teleport_graphics", delay = 0)
+                monster.anim("shifter_teleport")
+                monster.gfx("shifter_teleport_graphics", delay = 1)
+            }
+        }
+    }
+
+    /**
+     * Checks if a pest is blocked from shooting (2011 wiki).
+     * Defilers/torchers cannot shoot when in front of gates or brawlers.
+     * Gates: "if they are in the spaces right in front of one of the three gates, they cannot shoot over it"
+     * Brawlers: "Defilers and Torchers cannot shoot over brawlers"
+     *
+     * @param pest The pest to check
+     * @param gameData The game state data
+     * @return true if the pest is blocked from shooting, false otherwise
+     */
+    private fun isBlockedFromShooting(pest: NPC, gameData: PestGameData): Boolean {
+        // Check if in front of gate
+        for (fort in gameData.barricades.values) {
+            if (fort.intId < GATE_BREAK_ID) continue
+            
+            val distance = pest.tile.distanceTo(fort.tile)
+            if (distance <= 2) {
+                log.debug { "PEST SHOOTING BLOCKED: Pest ${pest.id} is in front of gate at ${fort.tile} (distance=$distance)" }
+                return true
+            }
+        }
+        
+        // Check if near brawler (defilers/torchers cannot shoot over brawlers)
+        for (brawler in gameData.pests) {
+            if (brawler.index == -1 || brawler.dead) continue
+            if (!brawler.id.contains("brawler")) continue
+            
+            val distance = pest.tile.distanceTo(brawler.tile)
+            if (distance <= 2) {
+                log.debug { "PEST SHOOTING BLOCKED: Pest ${pest.id} is near brawler ${brawler.id} at ${brawler.tile} (distance=$distance)" }
+                return true
+            }
+        }
+        
+        return false
     }
 
     /**
@@ -1727,27 +1839,7 @@ class PestControl : Script {
                 for (pest in gameData.pests.toList()) {
                     if (pest.index == -1 || pest.dead) continue
 
-                    // Check line of sight for ranged pests during combat (cancel if lost)
                     val pestId = pest.id
-                    val isRangedPest = pestId.contains("defiler") || pestId.contains("torcher")
-                    if (isRangedPest && pest.mode is CombatMovement) {
-                        val combatTarget = (pest.mode as CombatMovement).target
-                        val hasLineOfSight = lineValidator.hasLineOfSight(
-                            level = pest.tile.level,
-                            srcX = pest.tile.x,
-                            srcZ = pest.tile.y,
-                            destX = combatTarget.tile.x,
-                            destZ = combatTarget.tile.y,
-                            srcSize = 1,
-                            destWidth = 1,
-                            destHeight = 1
-                        )
-                        if (!hasLineOfSight) {
-                            log.debug { "PEST LINE OF SIGHT: Pest ${pest.id} lost line of sight to target, canceling combat" }
-                            pest.mode = EmptyMode
-                            continue
-                        }
-                    }
 
                     // Ravager logic runs BEFORE combat-state checks: 2009scape PCRavagerNPC always
                     // prioritizes barricades over combat and clears its pulse when a target is found.
@@ -1818,6 +1910,22 @@ class PestControl : Script {
                         }
                     }
 
+                    // Brawlers never attack the Void Knight (2011 wiki: "Brawlers will never attack the Void knight")
+                    val isBrawler = pestId.contains("brawler")
+                    if (isBrawler && target is NPC && target == knight) {
+                        log.debug { "PEST TARGETING: Brawler ${pest.id} skipping knight (brawlers never attack knight), targeting player instead" }
+                        val playerTarget = gameData.players.firstOrNull { player ->
+                            !player.dead && player.tile.distanceTo(pest.tile) <= 10
+                        }
+                        if (playerTarget != null) {
+                            playerTarget
+                        } else {
+                            null
+                        }
+                    } else {
+                        target
+                    }
+
                     if (target != null) {
                         val targetName = if (target is Player) target.name else "void_knight"
                         log.debug {
@@ -1828,25 +1936,16 @@ class PestControl : Script {
                             })"
                         }
 
-                        // Defilers and torchers use ranged attacks - check line of sight
-                        // They should not be able to hit through barricades/gates (verified with 2009scape)
+                        // Defilers and torchers can shoot over walls (2011 wiki)
+                        // They cannot shoot when in front of gates or brawlers (2011 wiki: "in the spaces right in front of one of the three gates", "cannot shoot over brawlers")
                         val isRangedPest = pestId.contains("defiler") || pestId.contains("torcher")
-                        val hasLineOfSight = if (isRangedPest) {
-                            lineValidator.hasLineOfSight(
-                                level = pest.tile.level,
-                                srcX = pest.tile.x,
-                                srcZ = pest.tile.y,
-                                destX = target.tile.x,
-                                destZ = target.tile.y,
-                                srcSize = 1,
-                                destWidth = 1,
-                                destHeight = 1
-                            )
+                        val blockedFromShooting = if (isRangedPest) {
+                            isBlockedFromShooting(pest, gameData)
                         } else {
-                            true // Melee pests don't need line of sight (they can walk to target)
+                            false
                         }
 
-                        if (hasLineOfSight) {
+                        if (!blockedFromShooting) {
                             // Use void engine's interaction system instead of direct combat() call
                             if (target is Player) {
                                 pest.interactPlayer(target, "Attack")
@@ -1854,7 +1953,7 @@ class PestControl : Script {
                                 pest.interactNpc(target as NPC, "Attack")
                             }
                         } else {
-                            log.debug { "PEST TARGETING: Pest ${pest.id} (ranged) has no line of sight to $targetName, skipping attack" }
+                            log.debug { "PEST TARGETING: Pest ${pest.id} (ranged) blocked from shooting, skipping attack on $targetName" }
                         }
                     } else {
                         log.debug { "PEST TARGETING: Pest ${pest.id} found no valid target" }
@@ -2043,6 +2142,10 @@ class PestControl : Script {
                     if (pest.id.contains("spinner")) {
                         pest["portal_index"] = index
                     }
+                    // Shifters need attack_range = 2 to allow diagonal attacks (matching 2009scape)
+                    if (pest.id.contains("shifter")) {
+                        pest["attack_range"] = 2
+                    }
                     gameData.pests.add(pest)
                     log.info { "Spawned pest $pestId at $pestTile for location $index (count: ${gameData.pestCounts[index]})" }
                 }
@@ -2132,6 +2235,9 @@ class PestControl : Script {
             player.interfaces.close("pest_control_playing")
             player.clearInstance()
             player.remove<String>("pest_control_difficulty")
+
+            // Reset NPC collision blocking
+            player.blockMove = 0
 
             // Remove player-to-game mapping
             playerToGameId.remove(player)

@@ -57,7 +57,7 @@ class Player(
 ) : Character {
 
     override val visuals: PlayerVisuals = PlayerVisuals(body)
-    override val blockMove = 0
+    override var blockMove = 0
     override val collisionFlag = CollisionFlag.BLOCK_PLAYERS
 
     init {

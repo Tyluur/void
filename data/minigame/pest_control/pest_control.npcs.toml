@@ -492,6 +492,7 @@ style = "crush"
 max_hit_melee = 70
 examine = "Mind your toes!"
 combat_def = "brawler"
+blocks_players = true
 
 [brawler_level_76]
 id = 3773
@@ -503,6 +504,7 @@ style = "crush"
 max_hit_melee = 90
 examine = "Mind your toes!"
 combat_def = "brawler"
+blocks_players = true
 
 [brawler_level_101]
 id = 3774
@@ -514,6 +516,7 @@ style = "crush"
 max_hit_melee = 120
 examine = "Mind your toes!"
 combat_def = "brawler"
+blocks_players = true
 
 [brawler_level_129]
 id = 3775
@@ -525,6 +528,7 @@ style = "crush"
 max_hit_melee = 140
 examine = "Mind your toes!"
 combat_def = "brawler"
+blocks_players = true
 
 [brawler_level_158]
 id = 3776
@@ -532,6 +536,7 @@ style = "crush"
 max_hit_melee = 150
 examine = "Mind your toes!"
 combat_def = "brawler"
+blocks_players = true
 
 [defiler_level_33]
 id = 3762

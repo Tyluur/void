@@ -934,6 +934,7 @@ object Params {
     const val SHADOW = 1912
     const val LINKED_SHADOW_NPC = 2098
     const val CATEGORY = 2195
+    const val BLOCKS_PLAYERS = 2196
 
     fun id(name: String) = idOrNull(name) ?: error("No parameter id found for name '$name'")
 
@@ -1348,6 +1349,7 @@ object Params {
         "shadow" -> SHADOW
         "linked_shadow_npc" -> LINKED_SHADOW_NPC
         "category" -> CATEGORY
+        "blocks_players" -> BLOCKS_PLAYERS
         else -> custom(name)
     }
 
