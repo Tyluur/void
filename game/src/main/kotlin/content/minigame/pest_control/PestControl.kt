@@ -325,8 +325,8 @@ class PestControl : Script {
                 gameData.portalsDestroyed++
                 gameData.shieldsDropped++ // Count as destroyed for win condition
 
-                // Restore 50 HP to Void Knight when portal destroyed
-                gameData.knightHealth = minOf(gameData.knightHealth + 50, gameData.difficultyConfig.knightHealth)
+                // Restore 500 HP to Void Knight when portal destroyed
+                gameData.knightHealth = minOf(gameData.knightHealth + 500, gameData.difficultyConfig.knightHealth)
 
                 // Explode all spinners associated with this portal
                 val spinnersToExplode =
@@ -2244,11 +2244,32 @@ class PestControl : Script {
 
             if (won) {
                 val currentPoints = player["pest_control_points", 0]
-                player["pest_control_points"] = currentPoints + points
-                player.message(
-                    "Congratulations! You successfully defended the Void Knight and earned $points commendation points!",
-                    ChatType.Game
-                )
+                val playerDamage = gameData.playerDamage[player] ?: 0
+                
+                // Check damage requirement (500 damage minimum)
+                if (playerDamage < 500) {
+                    player.message("You failed to deal at least 500 damage. No commendation points awarded.", ChatType.Game)
+                } else {
+                    // Check points cap (500 maximum)
+                    if (currentPoints + points > 500) {
+                        val pointsAwarded = 500 - currentPoints
+                        if (pointsAwarded > 0) {
+                            player["pest_control_points"] = 500
+                            player.message(
+                                "Congratulations! You successfully defended the Void Knight and earned $pointsAwarded commendation points (capped at 500).",
+                                ChatType.Game
+                            )
+                        } else {
+                            player.message("You have reached the maximum 500 commendation points. Exchange them before playing again.", ChatType.Game)
+                        }
+                    } else {
+                        player["pest_control_points"] = currentPoints + points
+                        player.message(
+                            "Congratulations! You successfully defended the Void Knight and earned $points commendation points!",
+                            ChatType.Game
+                        )
+                    }
+                }
             } else {
                 player.message("You failed to protect the Void Knight. No points awarded.", ChatType.Game)
             }

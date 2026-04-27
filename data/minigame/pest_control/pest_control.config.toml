@@ -9,7 +9,7 @@ exit_tile_x = 2657
 exit_tile_y = 2639
 exit_tile_level = 0
 portal_health = 2000
-reward_points = 3
+reward_points = 2
 portal_shielded_ids = ["portal_purple_unshielded_novice", "portal_blue_unshielded_novice", "portal_yellow_unshielded_novice", "portal_red_unshielded_novice"]
 portal_unshielded_ids = ["portal_purple_shielded_novice", "portal_blue_shielded_novice", "portal_yellow_shielded_novice", "portal_red_shielded_novice"]
 
@@ -22,7 +22,7 @@ exit_tile_x = 2644
 exit_tile_y = 2644
 exit_tile_level = 0
 portal_health = 2500
-reward_points = 4
+reward_points = 3
 portal_shielded_ids = ["portal_purple_unshielded_intermediate", "portal_blue_unshielded_intermediate", "portal_yellow_unshielded_intermediate", "portal_red_unshielded_intermediate"]
 portal_unshielded_ids = ["portal_purple_shielded_intermediate", "portal_blue_shielded_intermediate", "portal_yellow_shielded_intermediate", "portal_red_shielded_intermediate"]
 
@@ -35,7 +35,7 @@ exit_tile_x = 2638
 exit_tile_y = 2653
 exit_tile_level = 0
 portal_health = 2500
-reward_points = 5
+reward_points = 4
 portal_shielded_ids = ["portal_purple_unshielded_veteran", "portal_blue_unshielded_veteran", "portal_yellow_unshielded_veteran", "portal_red_unshielded_veteran"]
 portal_unshielded_ids = ["portal_purple_shielded_veteran", "portal_blue_shielded_veteran", "portal_yellow_shielded_veteran", "portal_red_shielded_veteran"]
 
