@@ -34,6 +34,9 @@ id = 3902
 [shifter_death]
 id = 3903
 
+[shifter_teleport]
+id = 3904
+
 [spinner_attack]
 id = 3908
 

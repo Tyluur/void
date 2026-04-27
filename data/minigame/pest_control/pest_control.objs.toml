@@ -43,67 +43,51 @@ examine = "A damaged wooden barricade."
 id = 14232
 examine = "A damaged wooden barricade."
 
-[barricade_destroyed_1]
-id = 14233
-examine = "A destroyed wooden barricade."
-
-[barricade_destroyed_2]
-id = 14234
-examine = "A destroyed wooden barricade."
-
-[barricade_destroyed_3]
-id = 14235
-examine = "A destroyed wooden barricade."
-
 # Gates
 [gate_closed_1]
-id = 14236
+id = 14233
 examine = "A wooden gate."
-
-[gate_open_1]
-id = 14237
-examine = "An open wooden gate."
-
-[gate_closed_2]
-id = 14238
-examine = "A wooden gate."
-
-[gate_open_2]
-id = 14239
-examine = "An open wooden gate."
-
-[gate_closed_3]
-id = 14240
-examine = "A wooden gate."
-
-[gate_open_3]
-id = 14241
-examine = "An open wooden gate."
-
-[gate_closed_4]
-id = 14242
-examine = "A wooden gate."
-
-[gate_open_4]
-id = 14243
-examine = "An open wooden gate."
 
 [gate_damaged_1]
-id = 14244
+id = 14234
 examine = "A damaged wooden gate."
 
+[gate_open_1]
+id = 14235
+examine = "An open wooden gate."
+
 [gate_damaged_2]
-id = 14245
+id = 14236
 examine = "A damaged wooden gate."
 
 [gate_damaged_3]
-id = 14246
+id = 14237
 examine = "A damaged wooden gate."
 
 [gate_damaged_4]
-id = 14247
+id = 14238
 examine = "A damaged wooden gate."
 
-[gate_destroyed_1]
-id = 14248
-examine = "A destroyed wooden gate."
+[gate_damaged_5]
+id = 14239
+examine = "A damaged wooden gate."
+
+[gate_damaged_6]
+id = 14240
+examine = "A damaged wooden gate."
+
+[gate_damaged_7]
+id = 14241
+examine = "A damaged wooden gate."
+
+[gate_damaged_8]
+id = 14242
+examine = "A damaged wooden gate."
+
+[gate_damaged_9]
+id = 14243
+examine = "A damaged wooden gate."
+
+[gate_damaged_10]
+id = 14244
+examine = "A damaged wooden gate."

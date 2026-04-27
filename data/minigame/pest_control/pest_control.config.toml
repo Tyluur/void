@@ -108,20 +108,16 @@ level = 0
 
 # Barricade spawn offsets (relative to region base)
 [barricade_offsets]
-# West gates
+# Gate offsets
 gates = [
+    # West gates
     {x = 46, y = 33},
     {x = 46, y = 32},
     {x = 32, y = 25},
     {x = 33, y = 25},
     # East gates
     {x = 19, y = 32},
-    {x = 19, y = 33},
-    # South gates
-    {x = 49, y = 33},
-    {x = 49, y = 32},
-    {x = 49, y = 31},
-    {x = 49, y = 30}
+    {x = 19, y = 33}
 ]
 # Barricades (non-gate walls)
 barricades = [

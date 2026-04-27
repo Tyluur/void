@@ -1,28 +1,44 @@
 package content.minigame.pest_control
 
 import com.github.michaelbull.logging.InlineLogger
-import content.entity.combat.Combat.Companion.combat
+import content.entity.combat.attackers
 import content.entity.combat.dead
 import content.entity.combat.hit.hit
+import content.entity.combat.target
 import content.entity.combat.underAttack
+import content.minigame.pest_control.PestControl.Companion.FORTIFICATION_PROGRESSION
+import content.minigame.pest_control.PestControl.Companion.INVALID_OBJECT_IDS
+import content.minigame.pest_control.PestControl.Companion.RAVAGER_TARGET_DISTANCE
 import content.quest.clearInstance
 import content.quest.instanceOffset
 import content.quest.setInstanceLogout
 import content.quest.smallInstance
+import org.rsmod.game.pathfinder.LineValidator
+import org.rsmod.game.pathfinder.flag.CollisionFlag
 import world.gregs.config.Config
+import world.gregs.voidps.engine.GameLoop
 import world.gregs.voidps.engine.Script
+import world.gregs.voidps.engine.client.instruction.handle.interactNpc
+import world.gregs.voidps.engine.client.instruction.handle.interactPlayer
 import world.gregs.voidps.engine.client.message
-import world.gregs.voidps.engine.entity.obj.GameObjects
-import world.gregs.voidps.engine.entity.obj.GameObject
+import world.gregs.voidps.engine.data.definition.ObjectDefinitions
+import world.gregs.voidps.engine.entity.World
 import world.gregs.voidps.engine.entity.character.mode.EmptyMode
 import world.gregs.voidps.engine.entity.character.mode.combat.CombatMovement
+import world.gregs.voidps.engine.entity.character.mode.move.Movement
 import world.gregs.voidps.engine.entity.character.move.tele
+import world.gregs.voidps.engine.entity.character.npc.NPC
 import world.gregs.voidps.engine.entity.character.npc.NPCs
 import world.gregs.voidps.engine.entity.character.player.Player
 import world.gregs.voidps.engine.entity.character.player.chat.ChatType
 import world.gregs.voidps.engine.entity.character.player.combatLevel
 import world.gregs.voidps.engine.entity.character.player.name
 import world.gregs.voidps.engine.entity.character.player.skill.Skill
+import world.gregs.voidps.engine.entity.item.Item
+import world.gregs.voidps.engine.entity.obj.GameObject
+import world.gregs.voidps.engine.entity.obj.GameObjects
+import world.gregs.voidps.engine.map.collision.Collisions
+import world.gregs.voidps.engine.map.collision.check
 import world.gregs.voidps.engine.timedLoad
 import world.gregs.voidps.engine.timer.Timer
 import world.gregs.voidps.engine.timer.toTicks
@@ -30,13 +46,6 @@ import world.gregs.voidps.type.Direction
 import world.gregs.voidps.type.Region
 import world.gregs.voidps.type.Tile
 import world.gregs.voidps.type.random
-import world.gregs.voidps.engine.map.collision.Collisions
-import org.rsmod.game.pathfinder.flag.CollisionFlag
-import world.gregs.voidps.engine.GameLoop
-import world.gregs.voidps.engine.map.collision.check
-import org.rsmod.game.pathfinder.LineValidator
-import world.gregs.voidps.engine.entity.World
-import world.gregs.voidps.engine.entity.obj.ObjectShape
 import java.util.concurrent.TimeUnit
 
 /**
@@ -111,6 +120,55 @@ class PestControl : Script {
     companion object {
         private val log = InlineLogger()
         private var nextGameId = 0
+
+        // Barricade & gate cache id ranges (mirrors 2009scape PestControlSession).
+        // 14224-14232 are barricade variants, 14233-14248 are gate variants.
+        private val FORTIFICATION_IDS = 14224..14248
+        private const val GATE_BREAK_ID = 14233
+        private val INVALID_OBJECT_IDS = setOf(14230, 14231, 14232, 14245, 14246, 14247, 14248)
+        private val FORTIFICATION_PROGRESSION = mapOf(
+            14224 to 14227,
+            14225 to 14228,
+            14226 to 14229,
+            14227 to 14230,
+            14228 to 14231,
+            14229 to 14232,
+            14233 to 14237,
+            14234 to 14238,
+            14235 to 14239,
+            14236 to 14240,
+            14237 to 14241,
+            14238 to 14242,
+            14239 to 14243,
+            14240 to 14244,
+            14241 to 14245,
+            14242 to 14246,
+            14243 to 14247,
+            14244 to 14248,
+        )
+
+        // 2009scape's PCRavagerNPC switches the scenery shape to 22 (debris/flat) when the
+        // fortification reaches its destroyed state - the cache models for the destroyed ids
+        // (14230-14232 barricades, 14245-14248 gates) only render properly at this shape.
+        private const val DESTROYED_OBJECT_SHAPE = 22
+
+        // Ravager combat tuning (matches 2009scape PCRavagerNPC)
+        private const val RAVAGER_ATTACK_RANGE = 1
+        private const val RAVAGER_ATTACK_COOLDOWN_TICKS = 5
+        private const val RAVAGER_TARGET_DISTANCE = 15 // RENDERING_DISTANCE / 3
+        private const val RAVAGER_LAST_ATTACK_KEY = "ravager_last_attack"
+        private const val RAVAGER_TARGET_KEY = "ravager_target"
+        private const val RAVAGER_FORTIFICATION_TARGET_KEY = "ravager_fortification_target"
+
+        // Shifter combat tuning (matches 2009scape PCShifterNPC)
+        private const val SHIFTER_TELEPORT_DISTANCE = 5
+        private const val SHIFTER_TELEPORT_RADIUS = 2
+        private const val SHIFTER_SQUIRE_ATTACK_CHANCE = 2 // 2/50 per tick
+
+        // Splatter combat tuning (matches 2009scape PCSplatterNPC)
+        private const val SPLATTER_EXPLOSION_RADIUS = 1
+        private const val SPLATTER_EXPLOSION_ANIM = 3888
+        private const val SPLATTER_BASE_GFX = 649
     }
 
     // Debug flag - set to true to skip 30-second lobby timer and start game immediately
@@ -118,7 +176,7 @@ class PestControl : Script {
 
     // Configuration loaded from Groml file
     private lateinit var config: PestControlConfig
-    
+
     // Line of sight validator for ranged attacks
     private val lineValidator = LineValidator(flags = Collisions.map)
 
@@ -271,7 +329,8 @@ class PestControl : Script {
                 gameData.knightHealth = minOf(gameData.knightHealth + 50, gameData.difficultyConfig.knightHealth)
 
                 // Explode all spinners associated with this portal
-                val spinnersToExplode = gameData.pests.filter { it.id.contains("spinner") && (it["portal_index"] as? Int) == portalIndex }
+                val spinnersToExplode =
+                    gameData.pests.filter { it.id.contains("spinner") && (it["portal_index"] as? Int) == portalIndex }
                 for (spinner in spinnersToExplode) {
                     // Damage nearby players
                     for (player in gameData.players) {
@@ -349,13 +408,13 @@ class PestControl : Script {
         val pestCounts: MutableList<Int> = mutableListOf(0, 0, 0, 0, 0), // 4 portals + knight
         val portalShielded: MutableList<Boolean> = mutableListOf(true, true, true, true), // All portals start shielded
         var shieldsDropped: Int = 0,
-        val portalNPCs: MutableList<world.gregs.voidps.engine.entity.character.npc.NPC?> = mutableListOf(
+        val portalNPCs: MutableList<NPC?> = mutableListOf(
             null, null, null, null
         ),
         var instanceTile: Tile? = null,
-        var knightNPC: world.gregs.voidps.engine.entity.character.npc.NPC? = null,
-        val pests: MutableList<world.gregs.voidps.engine.entity.character.npc.NPC> = mutableListOf(),
-        val barricades: MutableMap<Tile, Int> = mutableMapOf() // Tracks barricade objects and their current state (ID)
+        var knightNPC: NPC? = null,
+        val pests: MutableList<NPC> = mutableListOf(),
+        val barricades: MutableMap<Tile, GameObject> = mutableMapOf() // Tracks live barricade & gate game objects by tile
     )
 
     init {
@@ -541,6 +600,7 @@ class PestControl : Script {
                                             }
                                         }
                                     }
+
                                     "barricades" -> {
                                         val offsetList = list()
                                         barricadeOffsetsLocal = offsetList.mapNotNull { item ->
@@ -566,7 +626,8 @@ class PestControl : Script {
             difficulties.size
         }
 
-        config = PestControlConfig(difficulties, pestData, locations!!, timers!!, limits!!, barricadeOffsets, gateOffsets)
+        config =
+            PestControlConfig(difficulties, pestData, locations!!, timers!!, limits!!, barricadeOffsets, gateOffsets)
 
         // Log loaded config information
         log.info { "Pest Control Loaded configuration:" }
@@ -676,6 +737,22 @@ class PestControl : Script {
         // Player event handlers
         // Handle pest death - clean up pest counts and remove from tracking
         npcDeath("*") {
+            val pestId = this.id
+            // Splatters explode upon death (matrix4-style)
+            if (pestId.contains("splatter")) {
+                val spawnIndex = this["pest_control_spawn_index", -1]
+                for (gameData in activeGames.values) {
+                    if (gameData.pests.contains(this)) {
+                        performSplatterDeathExplosion(this, gameData)
+                        gameData.pestCounts[spawnIndex] = maxOf(0, gameData.pestCounts[spawnIndex] - 1)
+                        gameData.pests.remove(this)
+                        log.info { "Splatter ${this.id} exploded upon death at location $spawnIndex" }
+                        break
+                    }
+                }
+                return@npcDeath
+            }
+
             val spawnIndex = this["pest_control_spawn_index", -1]
             if (spawnIndex != -1) {
                 for (gameData in activeGames.values) {
@@ -713,7 +790,8 @@ class PestControl : Script {
                         // Teleport player to entrance point instead of removing them
                         val diffConfig = difficultyConfig(difficultyName)
                         if (diffConfig != null) {
-                            val entranceTile = Tile(diffConfig.exitTileX, diffConfig.exitTileY, diffConfig.exitTileLevel)
+                            val entranceTile =
+                                Tile(diffConfig.exitTileX, diffConfig.exitTileY, diffConfig.exitTileLevel)
                             tele(entranceTile)
                             message("Oh dear, you died! You have been returned to the entrance.", ChatType.Game)
                         }
@@ -803,7 +881,11 @@ class PestControl : Script {
                 "Next Departure: $minutesLeft minutes ${if (minutesLeft % 2 != 0) "30 seconds" else ""}"
             )
             player.interfaces.sendText("pest_control_waiting", "players_ready", "Player's Ready: ${lobby.size}")
-            player.variables.send("pest_control_points")
+            player.interfaces.sendText(
+                "pest_control_waiting",
+                "commendations",
+                "Commendations: ${player["pest_control_points", 0]}"
+            )
         }
     }
 
@@ -960,23 +1042,9 @@ class PestControl : Script {
         pestSpawnTimers[gameId] = pestSpawnIntervalSeconds
         shieldDropTimers[gameId] = firstShieldDropSeconds
 
-        // Find and track barricades and gates in the instance (they exist in map data)
+        // Track barricades & gates that ravagers can break (mirrors 2009scape's initBarricadesList)
         if (instanceTile != null) {
-            val regionBase = instanceTile
-            
-            // Track gates (ID 14233) from config offsets
-            for (offset in config.gateOffsets) {
-                val gateTile = regionBase.add(offset.x, offset.y, offset.level)
-                gameData.barricades[gateTile] = 14233 // Gate ID
-            }
-            
-            // Track barricades (ID 14227) from config offsets
-            for (offset in config.barricadeOffsets) {
-                val barricadeTile = regionBase.add(offset.x, offset.y, offset.level)
-                gameData.barricades[barricadeTile] = 14227 // Barricade ID
-            }
-            
-            log.debug { "Found ${config.gateOffsets.size} gates and ${config.barricadeOffsets.size} barricades for game $gameId" }
+            registerFortifications(gameData, instanceTile)
         }
 
         // Spawn NPCs in the instance after instances are created
@@ -1000,7 +1068,521 @@ class PestControl : Script {
             }
             log.info { "DEBUG MODE: Spawned ${gameData.pests.size} pests in $attempts attempts" }
             for (player in players) {
-                player.message("DEBUG MODE: All shields dropped and ${gameData.pests.size} pests spawned!", ChatType.Game)
+                player.message(
+                    "DEBUG MODE: All shields dropped and ${gameData.pests.size} pests spawned!",
+                    ChatType.Game
+                )
+            }
+        }
+    }
+
+    /**
+     * Locates each barricade & gate placed in the instanced region and tracks the live [GameObject]
+     * so ravagers can later [GameObjects.replace] / [GameObjects.remove] them on damage.
+     *
+     * Mirrors 2009scape's `PestControlSession.initBarricadesList`: the offset table is treated as
+     * a single list - the cache id at each tile decides whether it's a barricade or a gate (and
+     * therefore which damage progression applies).
+     */
+    private fun registerFortifications(gameData: PestGameData, regionBase: Tile) {
+        val offsets = config.barricadeOffsets.asSequence() + config.gateOffsets.asSequence()
+        var barricades = 0
+        var gates = 0
+        for (offset in offsets) {
+            val tile = regionBase.add(offset.x, offset.y, offset.level)
+            val obj = findFortification(tile) ?: continue
+            gameData.barricades[tile] = obj
+            if (obj.intId < GATE_BREAK_ID) barricades++ else gates++
+        }
+        log.debug { "Registered $barricades barricades and $gates gates for game ${gameData.gameId}" }
+    }
+
+    /**
+     * Finds the first barricade or gate [GameObject] at [tile] (any layer).
+     * Returns `null` if nothing in the cache fortification id range exists at this tile.
+     */
+    private fun findFortification(tile: Tile): GameObject? =
+        fortificationsAtTile(tile).firstOrNull()
+
+    /**
+     * Returns all fortification objects currently placed on [tile] across all object layers.
+     */
+    private fun fortificationsAtTile(tile: Tile): List<GameObject> =
+        GameObjects.at(tile).filter { it.intId in FORTIFICATION_IDS }
+
+    /**
+     * Drives a single ravager's barricade/gate-breaking behaviour.
+     *
+     * Picks the closest tracked fortification within [RAVAGER_TARGET_DISTANCE], paths to it, and on
+     * arrival animates an attack while transforming the live [GameObject] to its next damage state
+     * (or removing it once destroyed). Returns `true` when the ravager handled its turn so the
+     * caller can skip the default pest targeting flow.
+     *
+     * Mirrors `PCRavagerNPC.tick` from 2009scape but uses the void engine's [GameObjects] APIs.
+     */
+    private fun tickRavager(
+        pest: NPC,
+        gameData: PestGameData
+    ): Boolean {
+        val target = selectRavagerFortificationTarget(pest, gameData)
+        if (target != null) {
+            // Mirrors 2009scape's getPulseManager().clear(): drop any active combat so the ravager
+            // commits to its barricade target instead of continuing to attack a player/knight.
+            if (pest.mode is CombatMovement) {
+                pest.mode = EmptyMode
+            }
+
+            val targetTile = target.tile
+            if (pest.tile.distanceTo(targetTile) > RAVAGER_ATTACK_RANGE) {
+                walkRavagerToTarget(pest, targetTile)
+                return true
+            }
+
+            val lastAttackTick = pest[RAVAGER_LAST_ATTACK_KEY] as? Int ?: 0
+            if (GameLoop.tick - lastAttackTick < RAVAGER_ATTACK_COOLDOWN_TICKS) {
+                return true
+            }
+
+            attackFortification(pest, target, gameData)
+            return true
+        }
+
+        // No fortification in range. 2009scape's PCRavagerNPC does NOT actively seek players or
+        // the knight - ravagers only ever target scenery, and wander toward the squire (knight)
+        // with a 20% chance per tick when idle so they eventually reach a barricade group.
+        // Returning true here suppresses the default player-targeting flow in the caller.
+        pest.clear(RAVAGER_FORTIFICATION_TARGET_KEY)
+        if (pest.mode !is CombatMovement && random.nextInt(5) == 0) {
+            val knight = gameData.knightNPC
+            if (knight != null && pest.tile.distanceTo(knight.tile) > 1) {
+                walkRavagerToTarget(pest, knight.tile)
+            }
+        }
+        return true
+    }
+
+    /**
+     * Returns the closest tracked barricade or gate to [origin] within [RAVAGER_TARGET_DISTANCE],
+     * or `null` if no fortification is in range.
+     */
+    private fun closestFortification(origin: Tile, gameData: PestGameData): GameObject? =
+        gameData.barricades.values
+            .filter { origin.distanceTo(it.tile) <= RAVAGER_TARGET_DISTANCE }
+            .minByOrNull { origin.distanceTo(it.tile) }
+
+    /**
+     * Keep ravagers focused on one fortification until it is destroyed to avoid bouncing between
+     * nearby barricades/gates and leaving both in partial states.
+     */
+    private fun selectRavagerFortificationTarget(
+        pest: NPC,
+        gameData: PestGameData
+    ): GameObject? {
+        val lockedTile = pest[RAVAGER_FORTIFICATION_TARGET_KEY] as? Tile
+        if (lockedTile != null) {
+            val locked = gameData.barricades[lockedTile]
+            if (locked != null && pest.tile.distanceTo(locked.tile) <= RAVAGER_TARGET_DISTANCE) {
+                return locked
+            }
+        }
+        val next = closestFortification(pest.tile, gameData)
+        if (next != null) {
+            pest[RAVAGER_FORTIFICATION_TARGET_KEY] = next.tile
+        } else {
+            pest.clear(RAVAGER_FORTIFICATION_TARGET_KEY)
+        }
+        return next
+    }
+
+    /**
+     * Issues a walk command toward [tile] only when the ravager isn't already pathing there,
+     * preventing the path from being reset every tick (which would lock the NPC in place).
+     */
+    private fun walkRavagerToTarget(
+        pest: NPC,
+        tile: Tile
+    ) {
+        val currentTarget = pest[RAVAGER_TARGET_KEY] as? Tile
+        val isMoving = pest.mode is Movement && pest.mode !is world.gregs.voidps.engine.entity.character.mode.Wander
+        if (currentTarget != tile || !isMoving) {
+            pest.walkTo(tile)
+            pest[RAVAGER_TARGET_KEY] = tile
+        }
+    }
+
+    /**
+     * Performs a single ravager strike against [target], updating both the live game object and the
+     * tracked fortification map. Damage progression uses [FORTIFICATION_PROGRESSION]; the result is
+     * removed when its id falls in [INVALID_OBJECT_IDS].
+     *
+     * **Important**: we deliberately avoid [GameObjects.replace] here. That API tracks the
+     * map-original and automatically re-adds it when a replacement is removed. When the damage
+     * progression changes the object layer (e.g. shape 0 WALL → shape 22 GROUND_DECORATION for
+     * debris), the re-added original lands in the old layer while the new object sits in the new
+     * layer, causing both to be visible simultaneously. Instead we remove every fortification
+     * variant at the tile (sweeping for engine-restored originals) then [GameObjects.add] the new
+     * state as a fresh object.
+     */
+    private fun attackFortification(
+        pest: NPC,
+        target: GameObject,
+        gameData: PestGameData
+    ) {
+        val fortifications = fortificationsAtTile(target.tile)
+        if (fortifications.isEmpty()) {
+            gameData.barricades.remove(target.tile)
+            pest.clear(RAVAGER_FORTIFICATION_TARGET_KEY)
+            return
+        }
+        val liveTarget = fortifications.firstOrNull {
+            it.intId == target.intId && it.shape == target.shape && it.rotation == target.rotation
+        } ?: fortifications.firstOrNull { it.intId == target.intId } ?: fortifications.first()
+
+        pest.face(liveTarget.tile)
+        pest.anim("ravager_attack")
+        pest[RAVAGER_LAST_ATTACK_KEY] = GameLoop.tick
+
+        val currentId = liveTarget.intId
+        val nextId = FORTIFICATION_PROGRESSION[currentId]
+        if (nextId == null) {
+            log.warn { "FORT REPLACE: no progression entry for fortification id $currentId at ${liveTarget.tile}" }
+            gameData.barricades.remove(liveTarget.tile)
+            pest.clear(RAVAGER_FORTIFICATION_TARGET_KEY)
+            return
+        }
+        val destroyed = nextId in INVALID_OBJECT_IDS
+
+        val replacementName = ObjectDefinitions.getValue(nextId).stringId
+        if (replacementName.isEmpty()) {
+            log.warn { "FORT REPLACE: cache id $nextId has no toml stringId; tracking only" }
+            if (destroyed) gameData.barricades.remove(liveTarget.tile)
+            return
+        }
+        val resolvedId = ObjectDefinitions.get(replacementName).id
+        if (resolvedId == -1) {
+            log.warn { "FORT REPLACE: stringId '$replacementName' resolves to -1 (would vanish); aborting" }
+            if (destroyed) gameData.barricades.remove(liveTarget.tile)
+            return
+        }
+
+        val replacementShape = if (destroyed) DESTROYED_OBJECT_SHAPE else liveTarget.shape
+        val replacementRotation = if (destroyed) (liveTarget.rotation and 2) else liveTarget.rotation
+        log.debug {
+            "FORT REPLACE: tile=${liveTarget.tile} ${liveTarget.intId}(shape=${liveTarget.shape},rot=${liveTarget.rotation}) " +
+                    "-> $nextId='$replacementName'(resolved=$resolvedId, shape=$replacementShape, rot=$replacementRotation) destroyed=$destroyed"
+        }
+
+        // Remove ALL fortification objects at this tile. Removing a replacement causes the engine
+        // to re-add the map-original, so we sweep a second time to catch those restored objects.
+        for (fort in fortifications) {
+            GameObjects.remove(fort)
+        }
+        for (reAdded in fortificationsAtTile(liveTarget.tile)) {
+            GameObjects.remove(reAdded)
+        }
+
+        // Place the new damage state as a fresh temporary object (no replacement tracking).
+        val replacement = GameObjects.add(replacementName, liveTarget.tile, replacementShape, replacementRotation)
+        log.debug {
+            "FORT REPLACE result: replacement intId=${replacement.intId} shape=${replacement.shape} " +
+                    "rotation=${replacement.rotation} tile=${replacement.tile}"
+        }
+        if (destroyed) {
+            gameData.barricades.remove(liveTarget.tile)
+            pest.clear(RAVAGER_FORTIFICATION_TARGET_KEY)
+        } else {
+            gameData.barricades[liveTarget.tile] = replacement
+            pest[RAVAGER_FORTIFICATION_TARGET_KEY] = replacement.tile
+        }
+    }
+
+    /**
+     * Drives a single shifter's teleport behavior.
+     *
+     * Shifters use melee combat but can attack diagonally like ranged. When not in combat,
+     * they have a 2/50 chance per tick to target the Void Knight. When attacking and the
+     * target is more than 5 tiles away, they teleport within 2 tiles of the target.
+     *
+     * Mirrors `PCShifterNPC.tick` from 2009scape.
+     */
+    private fun tickShifter(
+        pest: NPC,
+        gameData: PestGameData
+    ): Boolean {
+        val knight = gameData.knightNPC
+        val inCombat = pest.mode is CombatMovement
+
+        // Retaliation: if under attack by a player, target them and teleport if > 5 tiles away
+        if (pest.underAttack) {
+            val attackers = pest.attackers.filterIsInstance<Player>()
+            if (attackers.isNotEmpty()) {
+                val attacker = attackers.first()
+                val distance = pest.tile.distanceTo(attacker.tile)
+                if (distance > SHIFTER_TELEPORT_DISTANCE) {
+                    log.debug { "SHIFTER RETALIATION: ${pest.id} under attack by ${attacker.name}, distance=$distance > $SHIFTER_TELEPORT_DISTANCE, teleporting to retaliate" }
+                    val destination = findShifterTeleportDestination(attacker.tile)
+                    if (destination != null) {
+                        performShifterTeleport(pest, destination)
+                    }
+                    pest.interactPlayer(attacker, "Attack")
+                    return true
+                } else {
+                    // Close enough to attack without teleport
+                    pest.interactPlayer(attacker, "Attack")
+                    return true
+                }
+            }
+        }
+
+        // When not in combat, 2/50 chance to target the knight
+        if (!inCombat && random.nextInt(50) < SHIFTER_SQUIRE_ATTACK_CHANCE) {
+            if (knight != null && knight.index != -1) {
+                // Check distance before starting combat - teleport if too far
+                val distance = pest.tile.distanceTo(knight.tile)
+                if (distance > SHIFTER_TELEPORT_DISTANCE) {
+                    log.debug { "SHIFTER TELEPORT: ${pest.id} distance=$distance > $SHIFTER_TELEPORT_DISTANCE, teleporting before combat" }
+                    val destination = findShifterTeleportDestination(knight.tile)
+                    if (destination != null) {
+                        performShifterTeleport(pest, destination)
+                    }
+                    // After teleport, start combat using void engine's interaction system
+                    pest.interactNpc(knight, "Attack")
+                    return true
+                }
+                pest.interactNpc(knight, "Attack")
+                return true
+            }
+        }
+
+        // When attacking and target is > 5 tiles away, teleport near target
+        if (inCombat) {
+            val target = (pest.mode as CombatMovement).target
+            if (target != null) {
+                val distance = pest.tile.distanceTo(target.tile)
+                if (distance > SHIFTER_TELEPORT_DISTANCE) {
+                    log.debug { "SHIFTER TELEPORT: ${pest.id} distance=$distance > $SHIFTER_TELEPORT_DISTANCE, teleporting to ${if (target is Player) target.name else "void_knight"}" }
+                    val destination = findShifterTeleportDestination(target.tile)
+                    if (destination != null) {
+                        performShifterTeleport(pest, destination)
+                    }
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /**
+     * Finds a valid teleport destination within 2 tiles of the target.
+     * Shuffles possible locations and returns the first valid floor tile.
+     * Shifters can teleport through walls (blocked for walking) but must end up on valid floor.
+     *
+     * Mirrors `PCShifterNPC.getDestination` from 2009scape, which uses `RegionManager.isTeleportPermitted`.
+     * Since void engine doesn't have teleport-permitted check, we use FLOOR flag to ensure valid floor.
+     */
+    private fun findShifterTeleportDestination(targetTile: Tile): Tile? {
+        val locations = mutableListOf<Tile>()
+        val radius = SHIFTER_TELEPORT_RADIUS
+        for (x in -radius..radius) {
+            for (y in -radius..radius) {
+                if (x != 0 || y != 0) {
+                    val tile = Tile(targetTile.x + x, targetTile.y + y, targetTile.level)
+                    // Check if tile has valid floor (not void/invalid)
+                    // This allows teleporting through walls but prevents teleporting to invalid tiles
+                    if (!Collisions.check(tile.x, tile.y, tile.level, CollisionFlag.FLOOR)) {
+                        locations.add(tile)
+                    }
+                }
+            }
+        }
+        locations.shuffle()
+        val destination = locations.firstOrNull()
+        if (destination != null) {
+            log.debug { "SHIFTER TELEPORT: Selected destination $destination around target $targetTile" }
+        } else {
+            log.debug { "SHIFTER TELEPORT: No valid floor tiles found around target $targetTile" }
+        }
+        return destination
+    }
+
+    /**
+     * Performs the shifter teleport animation and movement.
+     * Sends GFX 654 at source, teleports, plays animation 3904, sends GFX 654 at destination.
+     *
+     * Mirrors `PCShifterNPC.teleport` from 2009scape.
+     */
+    private fun performShifterTeleport(
+        pest: NPC,
+        destination: Tile
+    ) {
+        log.debug { "SHIFTER TELEPORT: ${pest.id} teleporting from ${pest.tile} to $destination" }
+        // Send GFX at source location
+        pest.gfx("shifter_teleport_graphics", delay = 0)
+
+        // Teleport immediately
+        pest.tele(destination, clearMode = false)
+
+        log.debug { "SHIFTER TELEPORT: ${pest.id} teleport complete, now at ${pest.tile}" }
+
+        // Play arrival animation and GFX at destination
+        pest.anim("shifter_teleport")
+        pest.gfx("shifter_teleport_graphics", delay = 1)
+    }
+
+    /**
+     * Drives a single splatter's self-destruct behavior.
+     *
+     * Splatters check for nearby barricades/gates when not in combat. If they find one,
+     * they self-destruct, damaging the fortification and nearby entities.
+     *
+     * Mirrors `PCSplatterNPC.tick` from 2009scape.
+     */
+    private fun tickSplatter(
+        pest: NPC,
+        gameData: PestGameData
+    ): Boolean {
+        val inCombat = pest.mode is CombatMovement
+        if (inCombat) {
+            return false
+        }
+
+        // Check if next to any barricade/gate
+        for (fort in gameData.barricades.values) {
+            if (pest.tile.distanceTo(fort.tile) <= 1) {
+                // Self-destruct immediately
+                performSplatterExplosion(pest, gameData)
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Performs the splatter explosion, damaging nearby fortifications and entities.
+     * Uses the same fortification progression as ravagers.
+     *
+     * Mirrors `PCSplatterNPC.explode` from 2009scape.
+     */
+    private fun performSplatterExplosion(
+        pest: NPC,
+        gameData: PestGameData
+    ) {
+        // Play explosion animation and GFX
+        pest.anim("splatter_explode_start")
+
+        // Map splatter ID to the correct graphics string ID
+        // Splatter IDs: 3727-3731 map to graphics variants
+        val splatterId = pest.def.id
+        val gfxStringId = when (splatterId) {
+            3727 -> "splatter_explosion_graphics"
+            3728 -> "splatter_explosion_graphics_33"
+            3729 -> "splatter_explosion_graphics_44"
+            3730 -> "splatter_explosion_graphics_54"
+            3731 -> "splatter_explosion_graphics_65"
+            else -> "splatter_explosion_graphics" // fallback
+        }
+        pest.gfx(gfxStringId, delay = 1)
+
+        // Damage nearby fortifications
+        for (fort in gameData.barricades.values.toList()) {
+            if (pest.tile.distanceTo(fort.tile) <= SPLATTER_EXPLOSION_RADIUS) {
+                val currentId = fort.intId
+                val nextId = FORTIFICATION_PROGRESSION[currentId]
+                if (nextId != null) {
+                    val destroyed = nextId in INVALID_OBJECT_IDS
+                    val replacementName = ObjectDefinitions.getValue(nextId).stringId
+                    if (replacementName.isNotEmpty()) {
+                        val resolvedId = ObjectDefinitions.get(replacementName).id
+                        if (resolvedId != -1) {
+                            val replacementShape = if (destroyed) DESTROYED_OBJECT_SHAPE else fort.shape
+                            val replacementRotation = if (destroyed) (fort.rotation and 2) else fort.rotation
+
+                            // Remove all fortifications at tile, sweep for engine-restored originals
+                            val fortifications = fortificationsAtTile(fort.tile)
+                            for (f in fortifications) {
+                                GameObjects.remove(f)
+                            }
+                            for (reAdded in fortificationsAtTile(fort.tile)) {
+                                GameObjects.remove(reAdded)
+                            }
+
+                            // Place the new damage state
+                            val replacement =
+                                GameObjects.add(replacementName, fort.tile, replacementShape, replacementRotation)
+                            if (destroyed) {
+                                gameData.barricades.remove(fort.tile)
+                            } else {
+                                gameData.barricades[fort.tile] = replacement
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Damage nearby players (based on splatter combat level / 3)
+        val splatterLevel = pest.def.combat
+        val maxDamage = splatterLevel / 3
+        val minDamage = maxDamage / 2
+        for (player in gameData.players) {
+            if (!player.dead && pest.tile.distanceTo(player.tile) <= SPLATTER_EXPLOSION_RADIUS) {
+                val damage = random.nextInt(minDamage, maxDamage + 1)
+                player.hit(player, damage = damage, offensiveType = "damage", weapon = Item.EMPTY)
+                gameData.playerDamage[player] = (gameData.playerDamage[player] ?: 0) + damage
+            }
+        }
+
+        // Remove the splatter NPC
+        NPCs.remove(pest)
+        gameData.pests.remove(pest)
+        val spawnIndex = pest["pest_control_spawn_index", -1]
+        if (spawnIndex != -1) {
+            gameData.pestCounts[spawnIndex] = maxOf(0, gameData.pestCounts[spawnIndex] - 1)
+        }
+    }
+
+    /**
+     * Performs the splatter death explosion when killed by players.
+     * Plays animation 3888, then 3889, then graphics, then damages nearby entities.
+     *
+     * Mirrors `Splatter.sendExplosion` from matrix4.
+     */
+    private fun performSplatterDeathExplosion(
+        pest: NPC,
+        gameData: PestGameData
+    ) {
+        // Capture tile and graphics ID before pest is removed
+        val explosionTile = pest.tile
+        val splatterId = pest.def.id
+        val gfxStringId = when (splatterId) {
+            3727 -> "splatter_explosion_graphics"
+            3728 -> "splatter_explosion_graphics_33"
+            3729 -> "splatter_explosion_graphics_44"
+            3730 -> "splatter_explosion_graphics_54"
+            3731 -> "splatter_explosion_graphics_65"
+            else -> "splatter_explosion_graphics"
+        }
+
+        // Play initial explosion animation
+        pest.anim("splatter_explode_start")
+
+        // Delay for first animation, then play second animation and graphics
+        World.queue("splatter_death_explosion_${pest.index}", 1) {
+            // Note: pest may be removed here, but we only need the tile for effects
+            // Send graphics at the explosion tile (can't send to removed NPC)
+            // For now, skip the second animation since pest is gone
+            // The graphics effect at the tile location is sufficient
+        }
+
+        // Delay for graphics, then damage nearby entities
+        World.queue("splatter_death_damage_${pest.index}", 1) {
+            // Damage nearby players (matrix4: random damage up to 400)
+            for (player in gameData.players) {
+                if (!player.dead && explosionTile.distanceTo(player.tile) <= 2) {
+                    val damage = random.nextInt(400)
+                    player.hit(player, damage = damage, offensiveType = "damage", weapon = Item.EMPTY)
+                    gameData.playerDamage[player] = (gameData.playerDamage[player] ?: 0) + damage
+                }
             }
         }
     }
@@ -1141,37 +1723,65 @@ class PestControl : Script {
             if (knight != null && knight.index != -1) {
                 gameData.pests.removeAll { it.index == -1 || it.dead }
                 log.debug { "PEST TARGETING: Processing ${gameData.pests.size} active pests, knight=$knight, knight.index=${knight.index}, knight.dead=${knight.dead}" }
-                for (pest in gameData.pests) {
+                // Iterate over a copy to avoid ConcurrentModificationException
+                for (pest in gameData.pests.toList()) {
                     if (pest.index == -1 || pest.dead) continue
-                    
+
                     // Check line of sight for ranged pests during combat (cancel if lost)
                     val pestId = pest.id
                     val isRangedPest = pestId.contains("defiler") || pestId.contains("torcher")
                     if (isRangedPest && pest.mode is CombatMovement) {
                         val combatTarget = (pest.mode as CombatMovement).target
-                        if (combatTarget != null) {
-                            val hasLineOfSight = lineValidator.hasLineOfSight(
-                                level = pest.tile.level,
-                                srcX = pest.tile.x,
-                                srcZ = pest.tile.y,
-                                destX = combatTarget.tile.x,
-                                destZ = combatTarget.tile.y,
-                                srcSize = 1,
-                                destWidth = 1,
-                                destHeight = 1
-                            )
-                            if (!hasLineOfSight) {
-                                log.debug { "PEST LINE OF SIGHT: Pest ${pest.id} lost line of sight to target, canceling combat" }
-                                pest.mode = EmptyMode
-                                continue
-                            }
+                        val hasLineOfSight = lineValidator.hasLineOfSight(
+                            level = pest.tile.level,
+                            srcX = pest.tile.x,
+                            srcZ = pest.tile.y,
+                            destX = combatTarget.tile.x,
+                            destZ = combatTarget.tile.y,
+                            srcSize = 1,
+                            destWidth = 1,
+                            destHeight = 1
+                        )
+                        if (!hasLineOfSight) {
+                            log.debug { "PEST LINE OF SIGHT: Pest ${pest.id} lost line of sight to target, canceling combat" }
+                            pest.mode = EmptyMode
+                            continue
                         }
                     }
-                    
-                    val alreadyTargetingKnight =
-                        pest.mode is CombatMovement && (pest.mode as CombatMovement).target == knight
-                    if (alreadyTargetingKnight) {
-                        log.debug { "PEST TARGETING: Pest ${pest.id} already targeting knight, skipping" }
+
+                    // Ravager logic runs BEFORE combat-state checks: 2009scape PCRavagerNPC always
+                    // prioritizes barricades over combat and clears its pulse when a target is found.
+                    if (pestId.contains("ravager") && tickRavager(pest, gameData)) {
+                        continue
+                    }
+
+                    // Shifter logic: teleports when target is > 5 tiles away
+                    // Shifters are excluded from the targeting loop below - they use the combat system's
+                    // target selection (matching matrix4 approach). tickShifter handles pre-combat
+                    // targeting to the knight and teleportation during combat.
+                    if (pestId.contains("shifter")) {
+                        tickShifter(pest, gameData)
+                        continue
+                    }
+
+                    // Splatter logic: self-destructs when next to barricades/gates
+                    if (pestId.contains("splatter") && tickSplatter(pest, gameData)) {
+                        continue
+                    }
+
+                    val alreadyInCombat = pest.mode is CombatMovement
+                    if (alreadyInCombat) {
+                        val target = (pest.mode as CombatMovement).target
+                        val targetName = if (target is Player) target.name else "void_knight"
+                        log.debug { "PEST TARGETING: Pest ${pest.id} already targeting $targetName, skipping" }
+                        continue
+                    }
+
+                    // Also skip if pest has a target assigned but not yet in combat (e.g., walking to target)
+                    // This prevents rapid reassignment when combat is rejected due to distance
+                    if (pest.target != null) {
+                        val targetName = if (pest.target is Player) (pest.target as Player).name else "void_knight"
+                        log.debug { "PEST TARGETING: Pest ${pest.id} has assigned target $targetName, skipping reassignment" }
                         continue
                     }
                     // Skip spinners - they prioritize healing their portal
@@ -1179,111 +1789,45 @@ class PestControl : Script {
                         log.debug { "PEST TARGETING: Pest ${pest.id} is spinner, skipping (prioritizes portal healing)" }
                         continue
                     }
-                    
-                    // Ravager logic: target and break barricades (based on 2009scape PCRavagerNPC)
-                    if (pestId.contains("ravager")) {
-                        log.debug { "RAVAGER: Pest ${pest.id} at ${pest.tile} checking for barricades, total barricades: ${gameData.barricades.size}" }
-                        
-                        // Ravagers prioritize barricades over combat
-                        // Find nearby barricade to target (within rendering distance / 3, similar to 2009scape)
-                        val nearbyBarricade = gameData.barricades.keys.firstOrNull { barricadeTile ->
-                            val distance = pest.tile.distanceTo(barricadeTile)
-                            log.debug { "RAVAGER: Checking barricade at $barricadeTile, distance: $distance" }
-                            distance <= 15 // Rendering distance / 3
-                        }
-                        
-                        log.debug { "RAVAGER: Pest ${pest.id} found barricade: ${nearbyBarricade != null}" }
-                        
-                        if (nearbyBarricade != null) {
-                            // Check if ravager is at the barricade and ready to attack
-                            val distanceToBarricade = pest.tile.distanceTo(nearbyBarricade)
-                            val lastAttackTick = pest["ravager_last_attack"] as? Int ?: 0
-                            val currentTick = GameLoop.tick
-                            val attackCooldown = 5 // 5 ticks (~3 seconds) between attacks (matches 2009scape)
-                            val timeSinceLastAttack = currentTick - lastAttackTick
-                            
-                            log.debug { "RAVAGER: Pest ${pest.id} distance to barricade: $distanceToBarricade, time since last attack: $timeSinceLastAttack, cooldown: $attackCooldown, mode=${pest.mode}" }
-                            
-                            if (distanceToBarricade <= 1 && timeSinceLastAttack >= attackCooldown) {
-                                // Attack the barricade
-                                val currentBarricadeId = gameData.barricades[nearbyBarricade] ?: 14227
-                                log.debug { "RAVAGER: Pest ${pest.id} attacking barricade at $nearbyBarricade, current ID: $currentBarricadeId" }
-                                
-                                // Play attack animation
-                                pest.anim("ravager_attack")
-                                
-                                // Calculate new barricade ID (damaged state)
-                                // 14227-14232 are barricades, 14233-14248 are gates
-                                // When damaged: newId = currentId + (currentId < 14233 ? 3 : 4)
-                                val newBarricadeId = currentBarricadeId + (if (currentBarricadeId < 14233) 3 else 4)
-                                
-                                // Check if barricade is destroyed (INVALID_OBJECT_IDS from 2009scape)
-                                val invalidObjectIds = setOf(14230, 14231, 14232, 14245, 14246, 14247, 14248)
-                                val isDestroyed = newBarricadeId in invalidObjectIds
-                                
-                                log.debug { "RAVAGER ATTACK: Pest ${pest.id} attacking barricade at $nearbyBarricade, currentId=$currentBarricadeId, newId=$newBarricadeId, destroyed=$isDestroyed" }
-                                
-                                // Update barricade state
-                                if (isDestroyed) {
-                                    // Remove destroyed barricade
-                                    gameData.barricades.remove(nearbyBarricade)
-                                    log.debug { "RAVAGER ATTACK: Barricade at $nearbyBarricade destroyed and removed" }
-                                } else {
-                                    // Update to damaged state
-                                    gameData.barricades[nearbyBarricade] = newBarricadeId
-                                    // Note: GameObjects.get() is private, so we can't do visual replacement
-                                    // The state is tracked in memory for logic purposes
-                                    log.debug { "RAVAGER ATTACK: Barricade at $nearbyBarricade damaged to ID $newBarricadeId" }
-                                }
-                                
-                                // Set attack cooldown
-                                pest["ravager_last_attack"] = currentTick
-                                
-                                // Face the barricade
-                                pest.face(nearbyBarricade)
-                                log.debug { "RAVAGER: Pest ${pest.id} faced barricade at $nearbyBarricade" }
-                            } else if (distanceToBarricade > 1) {
-                                // Check if we need to walk to the barricade
-                                val currentTarget = pest["ravager_target"] as? Tile
-                                val shouldWalk = currentTarget != nearbyBarricade
-                                
-                                log.debug { "RAVAGER: Pest ${pest.id} currentTarget=$currentTarget, barricade=$nearbyBarricade, shouldWalk=$shouldWalk" }
-                                
-                                if (shouldWalk) {
-                                    log.debug { "RAVAGER: Pest ${pest.id} walking to barricade at $nearbyBarricade (distance=$distanceToBarricade)" }
-                                    pest.walkTo(nearbyBarricade)
-                                    pest["ravager_target"] = nearbyBarricade
-                                    log.debug { "RAVAGER WALK: Pest ${pest.id} walking to barricade at $nearbyBarricade (distance=$distanceToBarricade)" }
-                                } else {
-                                    log.debug { "RAVAGER: Pest ${pest.id} already targeting this barricade, waiting to arrive" }
-                                }
-                            } else {
-                                log.debug { "RAVAGER: Pest ${pest.id} at barricade but on cooldown (time since last attack: $timeSinceLastAttack, cooldown: $attackCooldown)" }
-                            }
-                            
-                            // Ravager is targeting a barricade, skip normal targeting
-                            log.debug { "RAVAGER: Pest ${pest.id} skipping normal targeting (barricade focus)" }
-                            continue
-                        }
-                        log.debug { "RAVAGER: Pest ${pest.id} no nearby barricade, falling through to normal targeting" }
-                        // If no barricade nearby, fall through to normal targeting
-                    }
-                    
+
                     // Matrix4-style targeting: 33% chance to target knight, otherwise target nearby players
-                    val targetKnight = random.nextInt(3) == 0
-                    log.debug { "PEST TARGETING: Pest ${pest.id} roll: targetKnight=$targetKnight (random=${random.nextInt(3)}), pest.mode=${pest.mode}, pest.underAttack=${pest.underAttack}" }
-                    
+                    // If under attack, prioritize the attacking player (shifters especially should respond to attacks)
+                    val isShifter = pestId.contains("shifter")
+                    val targetKnight = if (pest.underAttack && !isShifter) {
+                        // Non-shifters: if under attack, 50% chance to target knight (less likely)
+                        random.nextInt(2) == 0
+                    } else if (pest.underAttack && isShifter) {
+                        // Shifters: if under attack, always target the attacking player
+                        false
+                    } else {
+                        // Not under attack: normal targeting
+                        if (isShifter) random.nextInt(3) != 0 else random.nextInt(3) == 0
+                    }
+                    log.debug {
+                        "PEST TARGETING: Pest ${pest.id} roll: targetKnight=$targetKnight (random=${
+                            random.nextInt(
+                                3
+                            )
+                        }), pest.mode=${pest.mode}, pest.underAttack=${pest.underAttack}"
+                    }
+
                     val target = if (targetKnight) knight else {
                         // Find and attack nearby players
                         gameData.players.firstOrNull { player ->
                             !player.dead && player.tile.distanceTo(pest.tile) <= 10
                         }
                     }
-                    
+
                     if (target != null) {
                         val targetName = if (target is Player) target.name else "void_knight"
-                        log.debug { "PEST TARGETING: Directing pest ${pest.id} to attack $targetName (distance=${pest.tile.distanceTo(target.tile)})" }
-                        
+                        log.debug {
+                            "PEST TARGETING: Directing pest ${pest.id} to attack $targetName (distance=${
+                                pest.tile.distanceTo(
+                                    target.tile
+                                )
+                            })"
+                        }
+
                         // Defilers and torchers use ranged attacks - check line of sight
                         // They should not be able to hit through barricades/gates (verified with 2009scape)
                         val isRangedPest = pestId.contains("defiler") || pestId.contains("torcher")
@@ -1301,11 +1845,14 @@ class PestControl : Script {
                         } else {
                             true // Melee pests don't need line of sight (they can walk to target)
                         }
-                        
+
                         if (hasLineOfSight) {
-                            // Torchers and defilers use ranged attacks - combat system will select appropriate style
-                            // based on their combat definitions (torcher.magic, defiler.range) with approach=false
-                            combat(pest, target)
+                            // Use void engine's interaction system instead of direct combat() call
+                            if (target is Player) {
+                                pest.interactPlayer(target, "Attack")
+                            } else {
+                                pest.interactNpc(target as NPC, "Attack")
+                            }
                         } else {
                             log.debug { "PEST TARGETING: Pest ${pest.id} (ranged) has no line of sight to $targetName, skipping attack" }
                         }
@@ -1410,8 +1957,8 @@ class PestControl : Script {
     private fun isValidSpawnTile(tile: Tile, instanceTile: Tile, portalTile: Tile?, gameData: PestGameData): Boolean {
         // Check if tile is within instance bounds (64x64 region)
         val inInstance = tile.x >= instanceTile.x && tile.x < instanceTile.x + 64 &&
-                        tile.y >= instanceTile.y && tile.y < instanceTile.y + 64 &&
-                        tile.level == instanceTile.level
+                tile.y >= instanceTile.y && tile.y < instanceTile.y + 64 &&
+                tile.level == instanceTile.level
         if (!inInstance) {
             return false
         }
