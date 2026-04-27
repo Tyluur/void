@@ -40,8 +40,10 @@ import world.gregs.voidps.engine.entity.obj.GameObject
 import world.gregs.voidps.engine.entity.obj.GameObjects
 import world.gregs.voidps.engine.inv.add
 import world.gregs.voidps.engine.inv.inventory
+import world.gregs.voidps.engine.inv.remove
 import world.gregs.voidps.engine.map.collision.Collisions
 import world.gregs.voidps.engine.map.collision.check
+import world.gregs.voidps.engine.queue.strongQueue
 import world.gregs.voidps.engine.timedLoad
 import world.gregs.voidps.engine.timer.Timer
 import world.gregs.voidps.engine.timer.toTicks
@@ -809,6 +811,7 @@ class PestControl : Script {
                 this.interfaces.close("pest_control_waiting")
                 this.clear("pest_control_difficulty")
                 this.clear("pest_control_in_lobby")
+                return@playerDeath
             }
 
             if (get("pest_control_game_active", false)) {
@@ -816,20 +819,32 @@ class PestControl : Script {
                 if (gameId != null) {
                     val gameData = activeGames[gameId]
                     if (gameData != null) {
-                        // Safe activity: respawn on the island with full stats (2010 wiki)
-                        // Teleport to entrance within the instance
+                        // Safe activity: no item drops, teleport to island entrance, prevent default respawn
+                        it.dropItems = false
                         val playerOffset = this.instanceOffset()
-                        tele(entrance.add(playerOffset))
-                        // Restore HP and prayer (respawn with full stats)
-                        levels.restore(Skill.Constitution, levels.getMax(Skill.Constitution))
-                        levels.restore(Skill.Prayer, levels.getMax(Skill.Prayer))
-                        message("Oh dear, you have died! But you quickly " +
-                                "recover and find yourself back at the lander.", ChatType.Game)
-                        // Re-enable NPC collision for brawler blocking
-                        this.blockMove = CollisionFlag.BLOCK_NPCS
-                        // Re-open game overlay
-                        this.interfaces.open("pest_control_playing")
-                        updateGameInterface(this, gameData)
+                        it.teleport = entrance.add(playerOffset)
+                        it.respawn = false
+
+                        // Capture player reference for queue
+                        val player = this
+
+                        // Restore stats after death animation completes
+                        strongQueue("pest_control_death_restore", 3) {
+                            Skill.all.forEach { skill ->
+                                player.levels.restore(skill, player.levels.getMax(skill))
+                            }
+                            player["run_energy"] = 10000
+                            player["special_attack_energy"] = 1000
+
+                            player.message("Oh dear, you have died! You have been returned to the island entrance.", ChatType.Game)
+
+                            // Re-enable NPC collision for brawler blocking
+                            player.blockMove = CollisionFlag.BLOCK_NPCS
+
+                            // Re-open game overlay
+                            player.interfaces.open("pest_control_playing")
+                            updateGameInterface(player, gameData)
+                        }
                         // Player stays in the game — do NOT remove from gameData or playerToGameId
                     }
                 }
@@ -1343,6 +1358,18 @@ class PestControl : Script {
     }
 
     /**
+     * Determines the correct object shape for a repaired barricade or gate.
+     * Matches 2009scape's `getObjectType`: shape 9 for diagonal wall variants,
+     * shape 0 for standard orientation.
+     *
+     * @param objectId The cache id of the repaired object
+     * @return The object shape (9 for diagonal walls, 0 otherwise)
+     */
+    private fun getRepairObjectType(objectId: Int): Int {
+        return if (objectId == 14225 || objectId == 14226 || objectId == 14228 || objectId == 14229) 9 else 0
+    }
+
+    /**
      * Repairs a damaged barricade or gate, replacing it with its previous (less damaged) state.
      * Credits the player with 50 damage toward the 500 zeal requirement.
      * (2010 wiki: "Repairing a barricade or gate acts as 50 points of damage on a monster")
@@ -1358,11 +1385,28 @@ class PestControl : Script {
         repairedId: Int,
         gameData: PestGameData
     ) {
+        // Require hammer (2009scape: item 2347)
+        if (!player.inventory.contains("hammer")) {
+            player.message("You'll need a hammer to make any repairs!", ChatType.Game)
+            return
+        }
+        // Require and consume 1 log (2009scape: item 1511)
+        if (!player.inventory.remove("logs")) {
+            player.message("You'll need some logs to make any repairs!", ChatType.Game)
+            return
+        }
+
         val replacementName = ObjectDefinitions.getValue(repairedId).stringId
         if (replacementName.isEmpty()) {
             log.warn { "REPAIR: cache id $repairedId has no toml stringId; aborting" }
             return
         }
+
+        // Play smithing/hammer animation (2009scape: anim 898)
+        player.anim("smith_item")
+
+        // Determine correct object shape (2009scape: getObjectType)
+        val repairedShape = getRepairObjectType(repairedId)
 
         // Remove all fortification objects at this tile (same sweep pattern as attackFortification)
         for (fort in fortificationsAtTile(target.tile)) {
@@ -1372,11 +1416,11 @@ class PestControl : Script {
             GameObjects.remove(reAdded)
         }
 
-        // Place repaired object (use original shape/rotation since we're restoring)
-        val replacement = GameObjects.add(replacementName, target.tile, target.shape, target.rotation)
+        // Place repaired object with correct shape
+        val replacement = GameObjects.add(replacementName, target.tile, repairedShape, target.rotation)
         gameData.barricades[target.tile] = replacement
 
-        // Credit 50 damage toward zeal requirement
+        // Credit 50 damage toward 500 zeal requirement
         gameData.playerDamage[player] = (gameData.playerDamage[player] ?: 0) + 50
         val type = if (target.intId < GATE_BREAK_ID) "barricade" else "gate"
         player.message("You repair the $type.", ChatType.Game)

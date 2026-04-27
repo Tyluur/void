@@ -18,7 +18,20 @@ examine = "Handy for boarding the ship."
 id = 14314
 examine = "Climb down to leave the lander."
 
-# Barricades
+# Barricades (undamaged - repair targets from first damage state)
+[barricade_undamaged_1]
+id = 14224
+examine = "A wooden barricade."
+
+[barricade_undamaged_2]
+id = 14225
+examine = "A wooden barricade."
+
+[barricade_undamaged_3]
+id = 14226
+examine = "A wooden barricade."
+
+# Barricades (first damage state - repairable)
 [barricade_1]
 id = 14227
 examine = "A wooden barricade."
@@ -91,3 +104,20 @@ examine = "A damaged wooden gate."
 [gate_damaged_10]
 id = 14244
 examine = "A damaged wooden gate."
+
+# Gates (destroyed states - needed for ravager damage progression & repair)
+[gate_destroyed_1]
+id = 14245
+examine = "A destroyed wooden gate."
+
+[gate_destroyed_2]
+id = 14246
+examine = "A destroyed wooden gate."
+
+[gate_destroyed_3]
+id = 14247
+examine = "A destroyed wooden gate."
+
+[gate_destroyed_4]
+id = 14248
+examine = "A destroyed wooden gate."
