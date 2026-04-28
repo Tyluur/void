@@ -707,6 +707,14 @@ class PestControl : Script {
         objectOperate("Cross", "pest_control_gangplank_novice") {
             this.enterLander("novice")
         }
+        // Intermediate gangplank entry
+        objectOperate("Cross", "pest_control_gangplank_intermediate") {
+            this.enterLander("intermediate")
+        }
+        // Veteran gangplank entry
+        objectOperate("Cross", "pest_control_gangplank_veteran") {
+            this.enterLander("veteran")
+        }
 
         // Exit gangplank from lander
         objectOperate("Cross", "pest_control_gangplank_exit") {
@@ -734,16 +742,10 @@ class PestControl : Script {
             repairFortification(this, obj, repairedId, gameData)
         }
 
-        // Squire talk-to for each difficulty
-        npcOperate("Talk-to", "squire_novice_pest_control") {
-            this.enterLander("novice")
-        }
-        npcOperate("Talk-to", "squire_intermediate_pest_control") {
-            this.enterLander("intermediate")
-        }
-        npcOperate("Talk-to", "squire_veteran_pest_control") {
-            this.enterLander("veteran")
-        }
+        // Note: Squire Talk-to interactions are now handled by:
+        // - LanderSquireDialogue.kt for lander squires (novice/intermediate/veteran)
+        // - OutpostSquireDialogue.kt for outpost squires
+        // - VoidKnightDialogue.kt for the Void Knight in the game
 
         // Start world timers
         worldSpawn {
