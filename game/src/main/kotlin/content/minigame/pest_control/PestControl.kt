@@ -1770,6 +1770,20 @@ class PestControl : Script {
             }
         }
 
+        // Damage nearby NPCs (2009scape: chain reactions + portal/knight damage)
+        for (npc in gameData.pests) {
+            if (npc.index == -1 || npc.dead || npc == pest) continue
+            if (pest.tile.distanceTo(npc.tile) <= SPLATTER_EXPLOSION_RADIUS) {
+                npc.hit(npc, damage = random.nextInt(minDamage, maxDamage + 1), offensiveType = "damage", weapon = Item.EMPTY)
+            }
+        }
+
+        // Also damage the Void Knight if in range
+        val knight = gameData.knightNPC
+        if (knight != null && knight.index != -1 && !knight.dead && pest.tile.distanceTo(knight.tile) <= SPLATTER_EXPLOSION_RADIUS) {
+            knight.hit(knight, damage = random.nextInt(minDamage, maxDamage + 1), offensiveType = "damage", weapon = Item.EMPTY)
+        }
+
         // Remove the splatter NPC
         NPCs.remove(pest)
         gameData.pests.remove(pest)
@@ -1821,6 +1835,20 @@ class PestControl : Script {
                     player.hit(player, damage = damage, offensiveType = "damage", weapon = Item.EMPTY)
                     gameData.playerDamage[player] = (gameData.playerDamage[player] ?: 0) + damage
                 }
+            }
+
+            // Damage nearby NPCs (2009scape: chain reactions + portal/knight damage)
+            for (npc in gameData.pests) {
+                if (npc.index == -1 || npc.dead) continue
+                if (explosionTile.distanceTo(npc.tile) <= 2) {
+                    npc.hit(npc, damage = random.nextInt(400), offensiveType = "damage", weapon = Item.EMPTY)
+                }
+            }
+
+            // Also damage the Void Knight if in range
+            val knight = gameData.knightNPC
+            if (knight != null && knight.index != -1 && !knight.dead && explosionTile.distanceTo(knight.tile) <= 2) {
+                knight.hit(knight, damage = random.nextInt(400), offensiveType = "damage", weapon = Item.EMPTY)
             }
         }
     }
@@ -2009,8 +2037,10 @@ class PestControl : Script {
                     }
 
                     // Matrix4-style targeting: 33% chance to target knight, otherwise target nearby players
+                    // Defilers/Torchers: 2009scape always targets knight when idle (not in combat)
                     // If under attack, prioritize the attacking player (shifters especially should respond to attacks)
                     val isShifter = pestId.contains("shifter")
+                    val isRangedPest = pestId.contains("defiler") || pestId.contains("torcher")
                     val targetKnight = if (pest.underAttack && !isShifter) {
                         // Non-shifters: if under attack, 50% chance to target knight (less likely)
                         random.nextInt(2) == 0
@@ -2019,7 +2049,10 @@ class PestControl : Script {
                         false
                     } else {
                         // Not under attack: normal targeting
-                        if (isShifter) random.nextInt(3) != 0 else random.nextInt(3) == 0
+                        // Defilers/Torchers ALWAYS target knight when idle (2009scape behavior)
+                        if (isRangedPest) true
+                        else if (isShifter) random.nextInt(3) != 0
+                        else random.nextInt(3) == 0
                     }
                     log.debug {
                         "PEST TARGETING: Pest ${pest.id} roll: targetKnight=$targetKnight (random=${
